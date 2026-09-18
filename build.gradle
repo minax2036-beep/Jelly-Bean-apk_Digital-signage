@@ -1,5 +1,9 @@
 buildscript {
     repositories {
+        maven {
+            url 'https://maven.google.com'
+        }
+
         mavenCentral()
     }
 
@@ -10,20 +14,10 @@ buildscript {
 
 allprojects {
     repositories {
-        mavenCentral()
-    }
-}buildscript {
-    repositories {
-        mavenCentral()
-    }
+        maven {
+            url 'https://maven.google.com'
+        }
 
-    dependencies {
-        classpath 'com.android.tools.build:gradle:2.2.3'
-    }
-}
-
-allprojects {
-    repositories {
         mavenCentral()
     }
 }

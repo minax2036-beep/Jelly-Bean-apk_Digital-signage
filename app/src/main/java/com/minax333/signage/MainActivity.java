@@ -15,7 +15,7 @@ public class MainActivity extends Activity {
 
         TextView textView = new TextView(this);
 
-        textView.setText("Signage\nAndroid 4.2.2");
+        textView.setText("Signage\nAndroid 4.2.2\nJelly Bean");
         textView.setTextColor(Color.WHITE);
         textView.setTextSize(32);
         textView.setGravity(Gravity.CENTER);

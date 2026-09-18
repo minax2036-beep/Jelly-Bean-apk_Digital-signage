@@ -22,10 +22,15 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+
+      - name: Accept Android SDK licenses
+        run: |
+          yes | sdkmanager --licenses || true
 
       - name: Install Android SDK 17
         run: |
-          yes | sdkmanager --licenses || true
           sdkmanager "platforms;android-17" "build-tools;25.0.3"
 
       - name: Install Gradle 2.14.1
@@ -35,7 +40,8 @@ jobs:
           echo "$PWD/gradle-2.14.1/bin" >> "$GITHUB_PATH"
 
       - name: Build APK
-        run: gradle assembleDebug --no-daemon
+        run: |
+          gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

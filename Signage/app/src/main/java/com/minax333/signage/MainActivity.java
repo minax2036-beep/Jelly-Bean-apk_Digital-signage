@@ -13,14 +13,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        getWindow().setFlags(
-                android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
-        );
-
         TextView textView = new TextView(this);
 
-        textView.setText("Hello World!");
+        textView.setText("Signage\nAndroid 4.2.2");
         textView.setTextColor(Color.WHITE);
         textView.setTextSize(32);
         textView.setGravity(Gravity.CENTER);

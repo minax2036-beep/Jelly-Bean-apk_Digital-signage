@@ -20,19 +20,33 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Check Android SDK
+      - name: Find Android SDK
         run: |
-          ls -la /usr/local/lib/android/sdk/
-          find /usr/local/lib/android/sdk/cmdline-tools -name sdkmanager -type f -print
+          echo "=== ANDROID_HOME ==="
+          echo "$ANDROID_HOME"
+
+          echo "=== ANDROID_SDK_ROOT ==="
+          echo "$ANDROID_SDK_ROOT"
+
+          echo "=== SDK directories ==="
+          ls -la /usr/local/lib/android/sdk/ || true
+
+          echo "=== Search sdkmanager ==="
+          find /usr/local/lib/android/sdk -type f -name sdkmanager -print 2>/dev/null || true
 
       - name: Install Android SDK packages
         run: |
-          SDKMANAGER="/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager"
+          SDKMANAGER=$(find /usr/local/lib/android/sdk -type f -name sdkmanager -print -quit)
 
-          if [ ! -f "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager not found"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found anywhere in Android SDK"
+            echo "Searching entire runner..."
+            find /usr/local/lib/android -type f -name sdkmanager -print 2>/dev/null || true
             exit 1
           fi
+
+          echo "Found sdkmanager:"
+          echo "$SDKMANAGER"
 
           chmod +x "$SDKMANAGER"
 

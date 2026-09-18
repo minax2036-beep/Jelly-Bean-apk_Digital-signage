@@ -2,10 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.minax333.signage">
 
-    <uses-sdk
-        android:minSdkVersion="17"
-        android:targetSdkVersion="17" />
-
     <application
         android:allowBackup="false"
         android:label="Signage"
@@ -14,7 +10,6 @@
         <activity
             android:name=".MainActivity"
             android:screenOrientation="landscape"
-            android:configChanges="orientation|keyboardHidden|screenSize"
             android:exported="true">
 
             <intent-filter>

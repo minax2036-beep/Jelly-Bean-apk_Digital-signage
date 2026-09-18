@@ -1,0 +1,19 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 17
+
+    defaultConfig {
+        applicationId "com.minax333.signage"
+        minSdkVersion 17
+        targetSdkVersion 17
+        versionCode 1
+        versionName "0.0.1"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}

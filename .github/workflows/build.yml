@@ -79,7 +79,7 @@ jobs:
 
           echo "SIGNING_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
 
-      - name: Build Debug and signed Release APKs
+            - name: Build Debug and signed Release APKs
         env:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
@@ -94,8 +94,8 @@ jobs:
             exit 1
           fi
 
-          gradle assembleDebug assembleRelease --no-daemon
-
+          gradle assembleDebug assembleRelease --no-daemon --stacktrace --info
+          
       - name: Verify Release APK signature
         run: |
           set -euo pipefail

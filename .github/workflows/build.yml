@@ -80,11 +80,11 @@ jobs:
           echo "SIGNING_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
 
             - name: Build Debug and signed Release APKs
-        env:
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: |
+          env:
+            SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+            SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+            SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          run: |
           set -euo pipefail
 
           if [ -z "$SIGNING_KEY_ALIAS" ] ||

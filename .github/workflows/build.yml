@@ -37,6 +37,8 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
+          set -euo pipefail
+
           SDKMANAGER=$(find /usr/local/lib/android/sdk -type f -name sdkmanager -print -quit)
 
           if [ -z "$SDKMANAGER" ]; then
@@ -50,6 +52,8 @@ jobs:
 
       - name: Install Gradle 8.7
         run: |
+          set -euo pipefail
+
           wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
           unzip -q gradle-8.7-bin.zip
           echo "$PWD/gradle-8.7/bin" >> "$GITHUB_PATH"
@@ -79,12 +83,12 @@ jobs:
 
           echo "SIGNING_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
 
-            - name: Build Debug and signed Release APKs
-          env:
-            SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-            SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-            SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          run: |
+      - name: Build Debug and signed Release APKs
+        env:
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: |
           set -euo pipefail
 
           if [ -z "$SIGNING_KEY_ALIAS" ] ||
@@ -95,7 +99,7 @@ jobs:
           fi
 
           gradle assembleDebug assembleRelease --no-daemon --stacktrace --info
-          
+
       - name: Verify Release APK signature
         run: |
           set -euo pipefail

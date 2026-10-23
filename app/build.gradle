@@ -1,3 +1,4 @@
+
 plugins {
     id 'com.android.application'
 }
@@ -15,9 +16,36 @@ android {
         versionName '0.0.1'
     }
 
+    signingConfigs {
+        release {
+            def keystorePath = System.getenv('SIGNING_KEYSTORE_PATH')
+            def keyAliasValue = System.getenv('SIGNING_KEY_ALIAS')
+            def keyPasswordValue = System.getenv('SIGNING_KEY_PASSWORD')
+            def storePasswordValue = System.getenv('SIGNING_STORE_PASSWORD')
+
+            if (keystorePath && keyAliasValue &&
+                    keyPasswordValue && storePasswordValue) {
+                storeFile file(keystorePath)
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+                storePassword storePasswordValue
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+
+            def keystorePath = System.getenv('SIGNING_KEYSTORE_PATH')
+            def keyAliasValue = System.getenv('SIGNING_KEY_ALIAS')
+            def keyPasswordValue = System.getenv('SIGNING_KEY_PASSWORD')
+            def storePasswordValue = System.getenv('SIGNING_STORE_PASSWORD')
+
+            if (keystorePath && keyAliasValue &&
+                    keyPasswordValue && storePasswordValue) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

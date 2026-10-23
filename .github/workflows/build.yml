@@ -1,3 +1,4 @@
+
 name: Build Android APK
 
 on:
@@ -5,6 +6,9 @@ on:
     branches:
       - main
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -40,9 +44,6 @@ jobs:
             exit 1
           fi
 
-          echo "Found sdkmanager:"
-          echo "$SDKMANAGER"
-
           "$SDKMANAGER" --licenses || true
 
           "$SDKMANAGER" "platforms;android-35" "build-tools;34.0.0"
@@ -54,15 +55,72 @@ jobs:
           echo "$PWD/gradle-8.7/bin" >> "$GITHUB_PATH"
 
       - name: Check Gradle
-        run: |
-          gradle --version
+        run: gradle --version
 
-      - name: Build APK
+      - name: Prepare release signing key
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
         run: |
-          gradle assembleDebug --no-daemon
+          set -euo pipefail
 
-      - name: Upload APK
+          if [ -z "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "ERROR: SIGNING_KEYSTORE_BASE64 is not configured."
+            exit 1
+          fi
+
+          KEYSTORE_PATH="$RUNNER_TEMP/signage-release.jks"
+
+          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+
+          if [ ! -s "$KEYSTORE_PATH" ]; then
+            echo "ERROR: Keystore file is empty."
+            exit 1
+          fi
+
+          echo "SIGNING_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
+      - name: Build Debug and signed Release APKs
+        env:
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$SIGNING_KEY_ALIAS" ] ||
+             [ -z "$SIGNING_KEY_PASSWORD" ] ||
+             [ -z "$SIGNING_STORE_PASSWORD" ]; then
+            echo "ERROR: One or more signing secrets are missing."
+            exit 1
+          fi
+
+          gradle assembleDebug assembleRelease --no-daemon
+
+      - name: Verify Release APK signature
+        run: |
+          set -euo pipefail
+
+          APK="app/build/outputs/apk/release/app-release.apk"
+          APKSIGNER="/usr/local/lib/android/sdk/build-tools/34.0.0/apksigner"
+
+          if [ ! -f "$APK" ]; then
+            echo "ERROR: Release APK not found."
+            exit 1
+          fi
+
+          if [ ! -x "$APKSIGNER" ]; then
+            echo "ERROR: apksigner not found."
+            exit 1
+          fi
+
+          "$APKSIGNER" verify --verbose "$APK"
+
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: Signage-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: Signage-APKs
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30

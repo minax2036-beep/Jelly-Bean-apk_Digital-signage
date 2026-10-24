@@ -1,4 +1,3 @@
-
 package com.minax333.signage;
 
 import android.app.Activity;
@@ -12,6 +11,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -40,13 +40,22 @@ public class MainActivity extends Activity {
     private TextView clockTextView;
     private TextView dateTextView;
     private TextView statusTextView;
+
     private Button settingsButton;
+    private Button musicButton;
+
     private LinearLayout settingsPanel;
+    private LinearLayout musicPanel;
+    private LinearLayout musicListLayout;
+
     private TextView slideshowStatusText;
     private TextView intervalStatusText;
     private TextView audioStatusText;
+    private TextView musicNowPlayingText;
+    private TextView musicEmptyText;
 
     private final Handler handler = new Handler();
+
     private SharedPreferences preferences;
     private MediaPlayer mediaPlayer;
 
@@ -62,23 +71,38 @@ public class MainActivity extends Activity {
     private int imageIndex = 0;
     private int audioIndex = 0;
 
+    private float touchStartX;
+    private float touchStartY;
+
     private boolean running = false;
     private boolean settingsVisible = false;
+    private boolean musicVisible = false;
     private boolean slideshowEnabled = true;
     private boolean audioEnabled = false;
     private boolean audioPreparing = false;
 
     private int slideshowSeconds = 10;
 
+    private String selectedAudioName = "";
+
     private static final String PREFS_NAME = "signage_settings";
+
     private static final String KEY_SLIDESHOW_ENABLED =
             "slideshow_enabled";
+
     private static final String KEY_SLIDESHOW_SECONDS =
             "slideshow_seconds";
+
     private static final String KEY_AUDIO_ENABLED =
             "audio_enabled";
 
+    private static final String KEY_SELECTED_AUDIO =
+            "selected_audio_name";
+
     private static final long CLOCK_INTERVAL = 1000L;
+
+    private static final float SWIPE_DISTANCE = 90f;
+    private static final float SWIPE_VERTICAL_LIMIT = 120f;
 
     private final Runnable clockRunnable = new Runnable() {
         @Override
@@ -95,7 +119,8 @@ public class MainActivity extends Activity {
     private final Runnable imageRunnable = new Runnable() {
         @Override
         public void run() {
-            if (!running || settingsVisible || !slideshowEnabled) {
+            if (!running || settingsVisible
+                    || musicVisible || !slideshowEnabled) {
                 return;
             }
 
@@ -141,6 +166,7 @@ public class MainActivity extends Activity {
 
         updateClock();
         loadImages();
+        loadAudioFiles();
 
         if (imageFiles.isEmpty()) {
             showStandby();
@@ -150,6 +176,7 @@ public class MainActivity extends Activity {
         }
 
         updateSettingsLabels();
+        updateMusicLibrary();
     }
 
     private void loadSettings() {
@@ -166,6 +193,11 @@ public class MainActivity extends Activity {
         audioEnabled = preferences.getBoolean(
                 KEY_AUDIO_ENABLED,
                 false
+        );
+
+        selectedAudioName = preferences.getString(
+                KEY_SELECTED_AUDIO,
+                ""
         );
 
         if (slideshowSeconds < 1) {
@@ -191,6 +223,10 @@ public class MainActivity extends Activity {
                         KEY_AUDIO_ENABLED,
                         audioEnabled
                 )
+                .putString(
+                        KEY_SELECTED_AUDIO,
+                        selectedAudioName
+                )
                 .apply();
     }
 
@@ -198,6 +234,9 @@ public class MainActivity extends Activity {
         rootLayout = new FrameLayout(this);
         rootLayout.setBackgroundColor(Color.BLACK);
 
+        /*
+         * Main slideshow image.
+         */
         imageView = new ImageView(this);
         imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         imageView.setBackgroundColor(Color.BLACK);
@@ -210,6 +249,9 @@ public class MainActivity extends Activity {
                 )
         );
 
+        /*
+         * Standby status.
+         */
         statusTextView = new TextView(this);
         statusTextView.setTextColor(Color.LTGRAY);
         statusTextView.setTextSize(18);
@@ -225,6 +267,9 @@ public class MainActivity extends Activity {
 
         rootLayout.addView(statusTextView, statusParams);
 
+        /*
+         * Date display.
+         */
         dateTextView = new TextView(this);
         dateTextView.setTextColor(Color.WHITE);
         dateTextView.setTextSize(18);
@@ -241,6 +286,9 @@ public class MainActivity extends Activity {
 
         rootLayout.addView(dateTextView, dateParams);
 
+        /*
+         * Clock display.
+         */
         clockTextView = new TextView(this);
         clockTextView.setTextColor(Color.WHITE);
         clockTextView.setTextSize(32);
@@ -257,9 +305,13 @@ public class MainActivity extends Activity {
 
         rootLayout.addView(clockTextView, clockParams);
 
+        /*
+         * Settings button.
+         */
         settingsButton = new Button(this);
         settingsButton.setText("設定");
         settingsButton.setTextSize(14);
+
         settingsButton.setOnClickListener(
                 new View.OnClickListener() {
                     @Override
@@ -277,15 +329,423 @@ public class MainActivity extends Activity {
                 );
 
         settingsButtonParams.setMargins(0, 8, 8, 0);
+
         rootLayout.addView(
                 settingsButton,
                 settingsButtonParams
         );
 
+        /*
+         * Music library button.
+         * This is provided as an alternative to swiping.
+         */
+        musicButton = new Button(this);
+        musicButton.setText("音楽 ♪");
+        musicButton.setTextSize(16);
+
+        musicButton.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        showMusicLibrary();
+                    }
+                }
+        );
+
+        FrameLayout.LayoutParams musicButtonParams =
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Gravity.BOTTOM | Gravity.RIGHT
+                );
+
+        musicButtonParams.setMargins(0, 0, 12, 90);
+
+        rootLayout.addView(
+                musicButton,
+                musicButtonParams
+        );
+
+        /*
+         * Swipe navigation.
+         * The listener returns false so ordinary touch handling
+         * remains available to child views.
+         */
+        rootLayout.setOnTouchListener(
+                new View.OnTouchListener() {
+                    @Override
+                    public boolean onTouch(
+                            View view,
+                            MotionEvent event
+                    ) {
+                        handleSwipe(event);
+                        return false;
+                    }
+                }
+        );
+
+        createMusicPanel();
         createSettingsPanel();
+
         setContentView(rootLayout);
     }
 
+    private void handleSwipe(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            touchStartX = event.getX();
+            touchStartY = event.getY();
+
+        } else if (event.getAction() == MotionEvent.ACTION_UP) {
+            float deltaX = event.getX() - touchStartX;
+            float deltaY = event.getY() - touchStartY;
+
+            if (Math.abs(deltaX) < SWIPE_DISTANCE) {
+                return;
+            }
+
+            if (Math.abs(deltaY) > SWIPE_VERTICAL_LIMIT) {
+                return;
+            }
+
+            if (settingsVisible) {
+                return;
+            }
+
+            if (!musicVisible && deltaX < 0) {
+                showMusicLibrary();
+
+            } else if (musicVisible && deltaX > 0) {
+                hideMusicLibrary();
+            }
+        }
+    }
+
+    /*
+     * Music library screen.
+     */
+    private void createMusicPanel() {
+        musicPanel = new LinearLayout(this);
+        musicPanel.setOrientation(LinearLayout.VERTICAL);
+        musicPanel.setPadding(20, 16, 20, 16);
+        musicPanel.setBackgroundColor(Color.rgb(24, 24, 24));
+        musicPanel.setVisibility(View.GONE);
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        Button backButton = new Button(this);
+        backButton.setText("戻る");
+        backButton.setTextSize(16);
+
+        backButton.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        hideMusicLibrary();
+                    }
+                }
+        );
+
+        header.addView(
+                backButton,
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+        );
+
+        TextView title = new TextView(this);
+        title.setText("音楽ライブラリ");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(24);
+        title.setGravity(Gravity.CENTER);
+
+        LinearLayout.LayoutParams titleParams =
+                new LinearLayout.LayoutParams(
+                        0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        1
+                );
+
+        header.addView(title, titleParams);
+
+        musicPanel.addView(
+                header,
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+        );
+
+        musicNowPlayingText = new TextView(this);
+        musicNowPlayingText.setTextColor(Color.LTGRAY);
+        musicNowPlayingText.setTextSize(17);
+        musicNowPlayingText.setPadding(8, 12, 8, 12);
+
+        musicPanel.addView(
+                musicNowPlayingText,
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+        );
+
+        musicEmptyText = new TextView(this);
+        musicEmptyText.setTextColor(Color.LTGRAY);
+        musicEmptyText.setTextSize(18);
+        musicEmptyText.setGravity(Gravity.CENTER);
+        musicEmptyText.setText(
+                "音楽ファイルがありません。\n"
+                        + "/sdcard/signage/audio/ に音楽を入れてください。"
+        );
+        musicEmptyText.setPadding(12, 24, 12, 24);
+
+        musicPanel.addView(
+                musicEmptyText,
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+        );
+
+        ScrollView scrollView = new ScrollView(this);
+
+        musicListLayout = new LinearLayout(this);
+        musicListLayout.setOrientation(LinearLayout.VERTICAL);
+
+        scrollView.addView(musicListLayout);
+
+        musicPanel.addView(
+                scrollView,
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        0,
+                        1
+                )
+        );
+
+        TextView hint = new TextView(this);
+        hint.setText(
+                "曲をタップすると選択できます。\n"
+                        + "左スワイプでメイン画面へ戻ります。"
+        );
+        hint.setTextColor(Color.LTGRAY);
+        hint.setTextSize(14);
+        hint.setPadding(8, 8, 8, 8);
+
+        musicPanel.addView(
+                hint,
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+        );
+
+        FrameLayout.LayoutParams panelParams =
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        Gravity.CENTER
+                );
+
+        rootLayout.addView(musicPanel, panelParams);
+    }
+
+    private void showMusicLibrary() {
+        if (settingsVisible) {
+            return;
+        }
+
+        musicVisible = true;
+
+        handler.removeCallbacks(imageRunnable);
+
+        loadAudioFiles();
+        updateMusicLibrary();
+
+        musicPanel.setVisibility(View.VISIBLE);
+        musicPanel.bringToFront();
+    }
+
+    private void hideMusicLibrary() {
+        musicVisible = false;
+        musicPanel.setVisibility(View.GONE);
+
+        settingsButton.bringToFront();
+        musicButton.bringToFront();
+
+        updateClock();
+        loadImages();
+
+        if (imageFiles.isEmpty()) {
+            showStandby();
+        } else {
+            if (imageIndex >= imageFiles.size()) {
+                imageIndex = 0;
+            }
+
+            showImage(imageFiles.get(imageIndex));
+        }
+
+        scheduleNextImage();
+    }
+
+    private void updateMusicLibrary() {
+        if (musicListLayout == null) {
+            return;
+        }
+
+        loadAudioFiles();
+
+        musicListLayout.removeAllViews();
+
+        if (audioFiles.isEmpty()) {
+            musicEmptyText.setVisibility(View.VISIBLE);
+        } else {
+            musicEmptyText.setVisibility(View.GONE);
+        }
+
+        for (int i = 0; i < audioFiles.size(); i++) {
+            final int index = i;
+            final File audioFile = audioFiles.get(i);
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(12, 12, 12, 12);
+
+            final boolean selected =
+                    audioFile.getName().equals(selectedAudioName);
+
+            if (selected) {
+                row.setBackgroundColor(Color.rgb(55, 75, 95));
+            } else {
+                row.setBackgroundColor(Color.rgb(36, 36, 36));
+            }
+
+            TextView number = new TextView(this);
+            number.setText(String.valueOf(i + 1));
+            number.setTextColor(Color.LTGRAY);
+            number.setTextSize(16);
+            number.setGravity(Gravity.CENTER);
+            number.setMinWidth(40);
+
+            row.addView(
+                    number,
+                    new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+            );
+
+            TextView name = new TextView(this);
+            name.setText(audioFile.getName());
+            name.setTextColor(Color.WHITE);
+            name.setTextSize(18);
+            name.setPadding(12, 4, 12, 4);
+
+            row.addView(
+                    name,
+                    new LinearLayout.LayoutParams(
+                            0,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            1
+                    )
+            );
+
+            TextView state = new TextView(this);
+            state.setText(selected ? "選択中" : "");
+            state.setTextColor(Color.rgb(150, 220, 255));
+            state.setTextSize(14);
+
+            row.addView(
+                    state,
+                    new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+            );
+
+            row.setMinimumHeight(64);
+
+            row.setOnClickListener(
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            selectAudioTrack(index);
+                        }
+                    }
+            );
+
+            musicListLayout.addView(
+                    row,
+                    new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+            );
+
+            View separator = new View(this);
+            separator.setBackgroundColor(Color.DKGRAY);
+
+            musicListLayout.addView(
+                    separator,
+                    new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            1
+                    )
+            );
+        }
+
+        updateNowPlayingLabel();
+    }
+
+    private void selectAudioTrack(int index) {
+        loadAudioFiles();
+
+        if (index < 0 || index >= audioFiles.size()) {
+            return;
+        }
+
+        audioIndex = index;
+        selectedAudioName = audioFiles.get(index).getName();
+
+        saveSettings();
+        updateMusicLibrary();
+        updateSettingsLabels();
+
+        /*
+         * If music is already enabled, immediately start the
+         * selected song. Otherwise, it will play when enabled.
+         */
+        if (audioEnabled && running) {
+            playAudioAtIndex(audioIndex);
+        }
+    }
+
+    private void updateNowPlayingLabel() {
+        if (musicNowPlayingText == null) {
+            return;
+        }
+
+        if (selectedAudioName == null
+                || selectedAudioName.length() == 0) {
+            musicNowPlayingText.setText(
+                    "選択中の曲：なし\n"
+                            + "曲をタップして選択してください。"
+            );
+        } else {
+            musicNowPlayingText.setText(
+                    "選択中の曲：" + selectedAudioName
+                            + "\n再生：ファイル名順・一覧を繰り返す"
+            );
+        }
+    }
+
+    /*
+     * Settings screen.
+     */
     private void createSettingsPanel() {
         settingsPanel = new LinearLayout(this);
         settingsPanel.setOrientation(LinearLayout.VERTICAL);
@@ -331,11 +791,13 @@ public class MainActivity extends Activity {
 
         Button toggleButton = new Button(this);
         toggleButton.setText("スライドショー オン／オフ");
+
         toggleButton.setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
                         slideshowEnabled = !slideshowEnabled;
+
                         saveSettings();
                         updateSettingsLabels();
                         restartImageTimer();
@@ -354,6 +816,7 @@ public class MainActivity extends Activity {
 
         Button intervalButton = new Button(this);
         intervalButton.setText("切り替え秒数を変更");
+
         intervalButton.setOnClickListener(
                 new View.OnClickListener() {
                     @Override
@@ -381,11 +844,13 @@ public class MainActivity extends Activity {
 
         Button audioToggleButton = new Button(this);
         audioToggleButton.setText("音楽 オン／オフ");
+
         audioToggleButton.setOnClickListener(
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
                         audioEnabled = !audioEnabled;
+
                         saveSettings();
                         updateSettingsLabels();
 
@@ -401,6 +866,26 @@ public class MainActivity extends Activity {
         content.addView(
                 audioToggleButton,
                 buttonLayoutParams()
+        );
+
+        TextView playbackInfo = new TextView(this);
+        playbackInfo.setText(
+                "\n再生方法\n"
+                        + "・曲一覧のファイル名順\n"
+                        + "・最後の曲の次は先頭へ戻る\n"
+                        + "・音楽一覧から曲を選択\n"
+                        + "・選択曲は設定に保存"
+        );
+        playbackInfo.setTextColor(Color.LTGRAY);
+        playbackInfo.setTextSize(16);
+        playbackInfo.setPadding(0, 12, 0, 16);
+
+        content.addView(
+                playbackInfo,
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                )
         );
 
         TextView futureTitle = new TextView(this);
@@ -424,6 +909,7 @@ public class MainActivity extends Activity {
 
         Button closeButton = new Button(this);
         closeButton.setText("設定を閉じる");
+
         closeButton.setOnClickListener(
                 new View.OnClickListener() {
                     @Override
@@ -469,6 +955,7 @@ public class MainActivity extends Activity {
 
     private void showSettings() {
         settingsVisible = true;
+
         handler.removeCallbacks(imageRunnable);
 
         updateSettingsLabels();
@@ -480,7 +967,9 @@ public class MainActivity extends Activity {
     private void hideSettings() {
         settingsVisible = false;
         settingsPanel.setVisibility(View.GONE);
+
         settingsButton.bringToFront();
+        musicButton.bringToFront();
 
         updateClock();
         loadImages();
@@ -515,8 +1004,18 @@ public class MainActivity extends Activity {
             audioStatusText.setText(
                     "状態：" + (audioEnabled ? "オン" : "オフ")
                             + "\n音楽ファイル数：" + audioFiles.size()
+                            + "\n選択中：" + getSelectedAudioDisplayName()
             );
         }
+    }
+
+    private String getSelectedAudioDisplayName() {
+        if (selectedAudioName == null
+                || selectedAudioName.length() == 0) {
+            return "なし";
+        }
+
+        return selectedAudioName;
     }
 
     private void showIntervalDialog() {
@@ -547,6 +1046,7 @@ public class MainActivity extends Activity {
                                     int which
                             ) {
                                 slideshowSeconds = seconds[which];
+
                                 saveSettings();
                                 updateSettingsLabels();
                                 restartImageTimer();
@@ -560,7 +1060,8 @@ public class MainActivity extends Activity {
     private void restartImageTimer() {
         handler.removeCallbacks(imageRunnable);
 
-        if (running && !settingsVisible && slideshowEnabled) {
+        if (running && !settingsVisible
+                && !musicVisible && slideshowEnabled) {
             scheduleNextImage();
         }
     }
@@ -568,7 +1069,8 @@ public class MainActivity extends Activity {
     private void scheduleNextImage() {
         handler.removeCallbacks(imageRunnable);
 
-        if (running && !settingsVisible && slideshowEnabled) {
+        if (running && !settingsVisible
+                && !musicVisible && slideshowEnabled) {
             handler.postDelayed(
                     imageRunnable,
                     slideshowSeconds * 1000L
@@ -583,6 +1085,9 @@ public class MainActivity extends Activity {
         dateTextView.setText(dateFormat.format(now));
     }
 
+    /*
+     * Image file discovery.
+     */
     private void loadImages() {
         imageFiles.clear();
 
@@ -609,8 +1114,15 @@ public class MainActivity extends Activity {
                 }
             }
         }
+
+        if (imageIndex >= imageFiles.size()) {
+            imageIndex = 0;
+        }
     }
 
+    /*
+     * Audio file discovery.
+     */
     private void loadAudioFiles() {
         audioFiles.clear();
 
@@ -638,9 +1150,50 @@ public class MainActivity extends Activity {
             }
         }
 
-        if (audioIndex >= audioFiles.size()) {
+        /*
+         * Restore the selected track by filename.
+         * This avoids relying on an index that could change
+         * if files are added or removed.
+         */
+        if (selectedAudioName != null
+                && selectedAudioName.length() > 0) {
+            int foundIndex = findAudioIndex(selectedAudioName);
+
+            if (foundIndex >= 0) {
+                audioIndex = foundIndex;
+            } else if (!audioFiles.isEmpty()) {
+                audioIndex = 0;
+            } else {
+                audioIndex = 0;
+            }
+        } else {
+            if (audioIndex >= audioFiles.size()) {
+                audioIndex = 0;
+            }
+
+            if (!audioFiles.isEmpty()
+                    && selectedAudioName.length() == 0) {
+                audioIndex = 0;
+            }
+        }
+
+        if (!audioFiles.isEmpty()) {
+            if (audioIndex < 0 || audioIndex >= audioFiles.size()) {
+                audioIndex = 0;
+            }
+        } else {
             audioIndex = 0;
         }
+    }
+
+    private int findAudioIndex(String fileName) {
+        for (int i = 0; i < audioFiles.size(); i++) {
+            if (audioFiles.get(i).getName().equals(fileName)) {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private List<File> findDirectories(String folderName) {
@@ -722,6 +1275,9 @@ public class MainActivity extends Activity {
                 || name.endsWith(".3gp");
     }
 
+    /*
+     * Image display.
+     */
     private void showImage(File file) {
         Bitmap bitmap = decodeImage(file);
 
@@ -798,6 +1354,12 @@ public class MainActivity extends Activity {
         dateTextView.setVisibility(View.VISIBLE);
     }
 
+    /*
+     * Audio playback.
+     *
+     * Tracks play in filename order. After the last track,
+     * playback returns to the first track.
+     */
     private void startAudioPlayback() {
         if (!running || !audioEnabled) {
             return;
@@ -811,10 +1373,11 @@ public class MainActivity extends Activity {
         updateSettingsLabels();
 
         if (audioFiles.isEmpty()) {
+            updateMusicLibrary();
             return;
         }
 
-        if (audioIndex >= audioFiles.size()) {
+        if (audioIndex < 0 || audioIndex >= audioFiles.size()) {
             audioIndex = 0;
         }
 
@@ -822,7 +1385,13 @@ public class MainActivity extends Activity {
     }
 
     private void playAudioAtIndex(int index) {
-        if (!running || !audioEnabled || audioFiles.isEmpty()) {
+        if (!running || !audioEnabled) {
+            return;
+        }
+
+        loadAudioFiles();
+
+        if (audioFiles.isEmpty()) {
             return;
         }
 
@@ -832,10 +1401,17 @@ public class MainActivity extends Activity {
 
         releaseAudioPlayer();
 
+        audioIndex = index;
+        selectedAudioName = audioFiles.get(audioIndex).getName();
+
+        saveSettings();
+        updateNowPlayingLabel();
+        updateSettingsLabels();
+
         final MediaPlayer player = new MediaPlayer();
+
         mediaPlayer = player;
         audioPreparing = true;
-        audioIndex = index;
 
         try {
             player.setDataSource(
@@ -856,6 +1432,7 @@ public class MainActivity extends Activity {
 
                             try {
                                 player.start();
+                                updateNowPlayingLabel();
                             } catch (IllegalStateException e) {
                                 skipToNextTrack();
                             }
@@ -871,13 +1448,28 @@ public class MainActivity extends Activity {
                                 return;
                             }
 
-                            audioIndex++;
+                            releaseAudioPlayer();
 
-                            if (audioIndex >= audioFiles.size()) {
-                                audioIndex = 0;
+                            loadAudioFiles();
+
+                            if (audioFiles.isEmpty()) {
+                                return;
                             }
 
-                            releaseAudioPlayer();
+                            int nextIndex = audioIndex + 1;
+
+                            if (nextIndex >= audioFiles.size()) {
+                                nextIndex = 0;
+                            }
+
+                            audioIndex = nextIndex;
+                            selectedAudioName =
+                                    audioFiles.get(audioIndex).getName();
+
+                            saveSettings();
+                            updateNowPlayingLabel();
+                            updateSettingsLabels();
+
                             handler.post(new Runnable() {
                                 @Override
                                 public void run() {
@@ -919,7 +1511,13 @@ public class MainActivity extends Activity {
     private void skipToNextTrack() {
         releaseAudioPlayer();
 
-        if (!running || !audioEnabled || audioFiles.isEmpty()) {
+        if (!running || !audioEnabled) {
+            return;
+        }
+
+        loadAudioFiles();
+
+        if (audioFiles.isEmpty()) {
             return;
         }
 
@@ -928,6 +1526,12 @@ public class MainActivity extends Activity {
         if (audioIndex >= audioFiles.size()) {
             audioIndex = 0;
         }
+
+        selectedAudioName = audioFiles.get(audioIndex).getName();
+
+        saveSettings();
+        updateNowPlayingLabel();
+        updateSettingsLabels();
 
         handler.postDelayed(new Runnable() {
             @Override
@@ -967,6 +1571,8 @@ public class MainActivity extends Activity {
     public void onBackPressed() {
         if (settingsVisible) {
             hideSettings();
+        } else if (musicVisible) {
+            hideMusicLibrary();
         } else {
             super.onBackPressed();
         }
@@ -995,6 +1601,7 @@ public class MainActivity extends Activity {
         }
 
         updateSettingsLabels();
+        updateMusicLibrary();
 
         handler.postDelayed(clockRunnable, CLOCK_INTERVAL);
         scheduleNextImage();

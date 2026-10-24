@@ -21,6 +21,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.media.MediaPlayer;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -43,10 +44,11 @@ public class MainActivity extends Activity {
     private LinearLayout settingsPanel;
     private TextView slideshowStatusText;
     private TextView intervalStatusText;
+    private TextView audioStatusText;
 
     private final Handler handler = new Handler();
-
     private SharedPreferences preferences;
+    private MediaPlayer mediaPlayer;
 
     private final SimpleDateFormat timeFormat =
             new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
@@ -55,12 +57,17 @@ public class MainActivity extends Activity {
             new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault());
 
     private final List<File> imageFiles = new ArrayList<File>();
+    private final List<File> audioFiles = new ArrayList<File>();
 
     private int imageIndex = 0;
+    private int audioIndex = 0;
+
     private boolean running = false;
     private boolean settingsVisible = false;
-
     private boolean slideshowEnabled = true;
+    private boolean audioEnabled = false;
+    private boolean audioPreparing = false;
+
     private int slideshowSeconds = 10;
 
     private static final String PREFS_NAME = "signage_settings";
@@ -68,6 +75,8 @@ public class MainActivity extends Activity {
             "slideshow_enabled";
     private static final String KEY_SLIDESHOW_SECONDS =
             "slideshow_seconds";
+    private static final String KEY_AUDIO_ENABLED =
+            "audio_enabled";
 
     private static final long CLOCK_INTERVAL = 1000L;
 
@@ -154,6 +163,11 @@ public class MainActivity extends Activity {
                 10
         );
 
+        audioEnabled = preferences.getBoolean(
+                KEY_AUDIO_ENABLED,
+                false
+        );
+
         if (slideshowSeconds < 1) {
             slideshowSeconds = 1;
         }
@@ -172,6 +186,10 @@ public class MainActivity extends Activity {
                 .putInt(
                         KEY_SLIDESHOW_SECONDS,
                         slideshowSeconds
+                )
+                .putBoolean(
+                        KEY_AUDIO_ENABLED,
+                        audioEnabled
                 )
                 .apply();
     }
@@ -265,7 +283,6 @@ public class MainActivity extends Activity {
         );
 
         createSettingsPanel();
-
         setContentView(rootLayout);
     }
 
@@ -313,7 +330,7 @@ public class MainActivity extends Activity {
         content.addView(slideshowStatusText);
 
         Button toggleButton = new Button(this);
-        toggleButton.setText("オン／オフ切り替え");
+        toggleButton.setText("スライドショー オン／オフ");
         toggleButton.setOnClickListener(
                 new View.OnClickListener() {
                     @Override
@@ -322,20 +339,11 @@ public class MainActivity extends Activity {
                         saveSettings();
                         updateSettingsLabels();
                         restartImageTimer();
-
-                        if (!slideshowEnabled) {
-                            handler.removeCallbacks(imageRunnable);
-                        } else {
-                            scheduleNextImage();
-                        }
                     }
                 }
         );
 
-        content.addView(
-                toggleButton,
-                buttonLayoutParams()
-        );
+        content.addView(toggleButton, buttonLayoutParams());
 
         intervalStatusText = new TextView(this);
         intervalStatusText.setTextColor(Color.LTGRAY);
@@ -355,8 +363,43 @@ public class MainActivity extends Activity {
                 }
         );
 
+        content.addView(intervalButton, buttonLayoutParams());
+
+        TextView audioTitle = new TextView(this);
+        audioTitle.setText("\n音楽再生");
+        audioTitle.setTextColor(Color.WHITE);
+        audioTitle.setTextSize(20);
+
+        content.addView(audioTitle);
+
+        audioStatusText = new TextView(this);
+        audioStatusText.setTextColor(Color.LTGRAY);
+        audioStatusText.setTextSize(16);
+        audioStatusText.setPadding(0, 8, 0, 8);
+
+        content.addView(audioStatusText);
+
+        Button audioToggleButton = new Button(this);
+        audioToggleButton.setText("音楽 オン／オフ");
+        audioToggleButton.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        audioEnabled = !audioEnabled;
+                        saveSettings();
+                        updateSettingsLabels();
+
+                        if (audioEnabled) {
+                            startAudioPlayback();
+                        } else {
+                            stopAudioPlayback();
+                        }
+                    }
+                }
+        );
+
         content.addView(
-                intervalButton,
+                audioToggleButton,
                 buttonLayoutParams()
         );
 
@@ -364,8 +407,7 @@ public class MainActivity extends Activity {
         futureTitle.setText(
                 "\n今後追加する機能\n"
                         + "・背景動画\n"
-                        + "・音楽再生\n"
-                        + "・表示する画像の選択\n"
+                        + "・画像の選択\n"
                         + "・文字表示の設定"
         );
         futureTitle.setTextColor(Color.LTGRAY);
@@ -391,10 +433,7 @@ public class MainActivity extends Activity {
                 }
         );
 
-        content.addView(
-                closeButton,
-                buttonLayoutParams()
-        );
+        content.addView(closeButton, buttonLayoutParams());
 
         scrollView.addView(content);
 
@@ -425,7 +464,6 @@ public class MainActivity extends Activity {
                 );
 
         params.setMargins(0, 6, 0, 6);
-
         return params;
     }
 
@@ -442,7 +480,6 @@ public class MainActivity extends Activity {
     private void hideSettings() {
         settingsVisible = false;
         settingsPanel.setVisibility(View.GONE);
-
         settingsButton.bringToFront();
 
         updateClock();
@@ -471,6 +508,13 @@ public class MainActivity extends Activity {
         if (intervalStatusText != null) {
             intervalStatusText.setText(
                     "切り替え間隔：" + slideshowSeconds + " 秒"
+            );
+        }
+
+        if (audioStatusText != null) {
+            audioStatusText.setText(
+                    "状態：" + (audioEnabled ? "オン" : "オフ")
+                            + "\n音楽ファイル数：" + audioFiles.size()
             );
         }
     }
@@ -503,7 +547,6 @@ public class MainActivity extends Activity {
                                     int which
                             ) {
                                 slideshowSeconds = seconds[which];
-
                                 saveSettings();
                                 updateSettingsLabels();
                                 restartImageTimer();
@@ -543,7 +586,7 @@ public class MainActivity extends Activity {
     private void loadImages() {
         imageFiles.clear();
 
-        List<File> directories = findImageDirectories();
+        List<File> directories = findDirectories("images");
 
         for (File directory : directories) {
             File[] files = directory.listFiles();
@@ -560,16 +603,47 @@ public class MainActivity extends Activity {
             });
 
             for (File file : files) {
-                if (file.isFile() && isImageFile(file)) {
-                    if (!imageFiles.contains(file)) {
-                        imageFiles.add(file);
-                    }
+                if (file.isFile() && isImageFile(file)
+                        && !imageFiles.contains(file)) {
+                    imageFiles.add(file);
                 }
             }
         }
     }
 
-    private List<File> findImageDirectories() {
+    private void loadAudioFiles() {
+        audioFiles.clear();
+
+        List<File> directories = findDirectories("audio");
+
+        for (File directory : directories) {
+            File[] files = directory.listFiles();
+
+            if (files == null) {
+                continue;
+            }
+
+            Arrays.sort(files, new java.util.Comparator<File>() {
+                @Override
+                public int compare(File a, File b) {
+                    return a.getName().compareToIgnoreCase(b.getName());
+                }
+            });
+
+            for (File file : files) {
+                if (file.isFile() && isAudioFile(file)
+                        && !audioFiles.contains(file)) {
+                    audioFiles.add(file);
+                }
+            }
+        }
+
+        if (audioIndex >= audioFiles.size()) {
+            audioIndex = 0;
+        }
+    }
+
+    private List<File> findDirectories(String folderName) {
         List<File> result = new ArrayList<File>();
         List<File> roots = new ArrayList<File>();
 
@@ -580,9 +654,9 @@ public class MainActivity extends Activity {
         addRoot(roots, new File("/mnt/media_rw"));
 
         for (File root : roots) {
-            addImageDirectory(
+            addMediaDirectory(
                     result,
-                    new File(root, "signage/images")
+                    new File(root, "signage/" + folderName)
             );
 
             File[] children = root.listFiles();
@@ -593,9 +667,12 @@ public class MainActivity extends Activity {
 
             for (File child : children) {
                 if (child.isDirectory()) {
-                    addImageDirectory(
+                    addMediaDirectory(
                             result,
-                            new File(child, "signage/images")
+                            new File(
+                                    child,
+                                    "signage/" + folderName
+                            )
                     );
                 }
             }
@@ -612,7 +689,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void addImageDirectory(
+    private void addMediaDirectory(
             List<File> directories,
             File directory
     ) {
@@ -632,6 +709,17 @@ public class MainActivity extends Activity {
                 || name.endsWith(".webp")
                 || name.endsWith(".bmp")
                 || name.endsWith(".gif");
+    }
+
+    private boolean isAudioFile(File file) {
+        String name = file.getName().toLowerCase(Locale.US);
+
+        return name.endsWith(".mp3")
+                || name.endsWith(".m4a")
+                || name.endsWith(".aac")
+                || name.endsWith(".ogg")
+                || name.endsWith(".wav")
+                || name.endsWith(".3gp");
     }
 
     private void showImage(File file) {
@@ -710,6 +798,171 @@ public class MainActivity extends Activity {
         dateTextView.setVisibility(View.VISIBLE);
     }
 
+    private void startAudioPlayback() {
+        if (!running || !audioEnabled) {
+            return;
+        }
+
+        if (mediaPlayer != null || audioPreparing) {
+            return;
+        }
+
+        loadAudioFiles();
+        updateSettingsLabels();
+
+        if (audioFiles.isEmpty()) {
+            return;
+        }
+
+        if (audioIndex >= audioFiles.size()) {
+            audioIndex = 0;
+        }
+
+        playAudioAtIndex(audioIndex);
+    }
+
+    private void playAudioAtIndex(int index) {
+        if (!running || !audioEnabled || audioFiles.isEmpty()) {
+            return;
+        }
+
+        if (index < 0 || index >= audioFiles.size()) {
+            index = 0;
+        }
+
+        releaseAudioPlayer();
+
+        final MediaPlayer player = new MediaPlayer();
+        mediaPlayer = player;
+        audioPreparing = true;
+        audioIndex = index;
+
+        try {
+            player.setDataSource(
+                    audioFiles.get(audioIndex).getAbsolutePath()
+            );
+
+            player.setOnPreparedListener(
+                    new MediaPlayer.OnPreparedListener() {
+                        @Override
+                        public void onPrepared(MediaPlayer mp) {
+                            if (mediaPlayer != player
+                                    || !running
+                                    || !audioEnabled) {
+                                return;
+                            }
+
+                            audioPreparing = false;
+
+                            try {
+                                player.start();
+                            } catch (IllegalStateException e) {
+                                skipToNextTrack();
+                            }
+                        }
+                    }
+            );
+
+            player.setOnCompletionListener(
+                    new MediaPlayer.OnCompletionListener() {
+                        @Override
+                        public void onCompletion(MediaPlayer mp) {
+                            if (mediaPlayer != player) {
+                                return;
+                            }
+
+                            audioIndex++;
+
+                            if (audioIndex >= audioFiles.size()) {
+                                audioIndex = 0;
+                            }
+
+                            releaseAudioPlayer();
+                            handler.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    startAudioPlayback();
+                                }
+                            });
+                        }
+                    }
+            );
+
+            player.setOnErrorListener(
+                    new MediaPlayer.OnErrorListener() {
+                        @Override
+                        public boolean onError(
+                                MediaPlayer mp,
+                                int what,
+                                int extra
+                        ) {
+                            if (mediaPlayer == player) {
+                                skipToNextTrack();
+                            }
+
+                            return true;
+                        }
+                    }
+            );
+
+            player.prepareAsync();
+
+        } catch (IOException e) {
+            skipToNextTrack();
+        } catch (IllegalArgumentException e) {
+            skipToNextTrack();
+        } catch (IllegalStateException e) {
+            skipToNextTrack();
+        }
+    }
+
+    private void skipToNextTrack() {
+        releaseAudioPlayer();
+
+        if (!running || !audioEnabled || audioFiles.isEmpty()) {
+            return;
+        }
+
+        audioIndex++;
+
+        if (audioIndex >= audioFiles.size()) {
+            audioIndex = 0;
+        }
+
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                startAudioPlayback();
+            }
+        }, 500L);
+    }
+
+    private void stopAudioPlayback() {
+        releaseAudioPlayer();
+    }
+
+    private void releaseAudioPlayer() {
+        if (mediaPlayer != null) {
+            MediaPlayer oldPlayer = mediaPlayer;
+
+            mediaPlayer = null;
+            audioPreparing = false;
+
+            oldPlayer.setOnPreparedListener(null);
+            oldPlayer.setOnCompletionListener(null);
+            oldPlayer.setOnErrorListener(null);
+
+            try {
+                oldPlayer.stop();
+            } catch (IllegalStateException ignored) {
+            }
+
+            oldPlayer.release();
+        } else {
+            audioPreparing = false;
+        }
+    }
+
     @Override
     public void onBackPressed() {
         if (settingsVisible) {
@@ -730,7 +983,9 @@ public class MainActivity extends Activity {
 
         loadSettings();
         updateClock();
+
         loadImages();
+        loadAudioFiles();
 
         if (imageFiles.isEmpty()) {
             showStandby();
@@ -743,6 +998,10 @@ public class MainActivity extends Activity {
 
         handler.postDelayed(clockRunnable, CLOCK_INTERVAL);
         scheduleNextImage();
+
+        if (audioEnabled) {
+            startAudioPlayback();
+        }
     }
 
     @Override
@@ -751,6 +1010,8 @@ public class MainActivity extends Activity {
 
         handler.removeCallbacks(clockRunnable);
         handler.removeCallbacks(imageRunnable);
+
+        stopAudioPlayback();
 
         super.onPause();
     }
@@ -761,6 +1022,8 @@ public class MainActivity extends Activity {
 
         handler.removeCallbacks(clockRunnable);
         handler.removeCallbacks(imageRunnable);
+
+        stopAudioPlayback();
 
         if (imageView != null) {
             imageView.setImageDrawable(null);

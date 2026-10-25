@@ -44,15 +44,8 @@ public class MainActivity extends Activity {
     private Button settingsButton;
     private Button musicButton;
 
-    private LinearLayout settingsPanel;
-    private LinearLayout musicPanel;
-    private LinearLayout musicListLayout;
-
-    private TextView slideshowStatusText;
-    private TextView intervalStatusText;
-    private TextView audioStatusText;
-    private TextView musicNowPlayingText;
-    private TextView musicEmptyText;
+    private SettingsPanel settingsPanel;
+    private MusicPanel musicPanel;
 
     private final Handler handler = new Handler();
 
@@ -378,132 +371,28 @@ public class MainActivity extends Activity {
      * Music library screen.
      */
     private void createMusicPanel() {
-        musicPanel = new LinearLayout(this);
-        musicPanel.setOrientation(LinearLayout.VERTICAL);
-        musicPanel.setPadding(20, 16, 20, 16);
-        musicPanel.setBackgroundColor(Color.rgb(24, 24, 24));
-        musicPanel.setVisibility(View.GONE);
-
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-
-        Button backButton = new Button(this);
-        backButton.setText("戻る");
-        backButton.setTextSize(16);
-
-        backButton.setOnClickListener(
-                new View.OnClickListener() {
+        musicPanel = new MusicPanel(
+                this,
+                new MusicPanel.Listener() {
                     @Override
-                    public void onClick(View view) {
+                    public void onBack() {
                         hideMusicLibrary();
+                    }
+
+                    @Override
+                    public void onSelectTrack(int index) {
+                        selectAudioTrack(index);
                     }
                 }
         );
-
-        header.addView(
-                backButton,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-        );
-
-        TextView title = new TextView(this);
-        title.setText("音楽ライブラリ");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(24);
-        title.setGravity(Gravity.CENTER);
-
-        LinearLayout.LayoutParams titleParams =
-                new LinearLayout.LayoutParams(
-                        0,
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        1
-                );
-
-        header.addView(title, titleParams);
-
-        musicPanel.addView(
-                header,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-        );
-
-        musicNowPlayingText = new TextView(this);
-        musicNowPlayingText.setTextColor(Color.LTGRAY);
-        musicNowPlayingText.setTextSize(17);
-        musicNowPlayingText.setPadding(8, 12, 8, 12);
-
-        musicPanel.addView(
-                musicNowPlayingText,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-        );
-
-        musicEmptyText = new TextView(this);
-        musicEmptyText.setTextColor(Color.LTGRAY);
-        musicEmptyText.setTextSize(18);
-        musicEmptyText.setGravity(Gravity.CENTER);
-        musicEmptyText.setText(
-                "音楽ファイルがありません。\n"
-                        + "/sdcard/signage/audio/ に音楽を入れてください。"
-        );
-        musicEmptyText.setPadding(12, 24, 12, 24);
-
-        musicPanel.addView(
-                musicEmptyText,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-        );
-
-        ScrollView scrollView = new ScrollView(this);
-
-        musicListLayout = new LinearLayout(this);
-        musicListLayout.setOrientation(LinearLayout.VERTICAL);
-
-        scrollView.addView(musicListLayout);
-
-        musicPanel.addView(
-                scrollView,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        0,
-                        1
-                )
-        );
-
-        TextView hint = new TextView(this);
-        hint.setText(
-                "曲をタップすると選択できます。\n"
-                        + "左スワイプでメイン画面へ戻ります。"
-        );
-        hint.setTextColor(Color.LTGRAY);
-        hint.setTextSize(14);
-        hint.setPadding(8, 8, 8, 8);
-
-        musicPanel.addView(
-                hint,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-        );
-
-        FrameLayout.LayoutParams panelParams =
+        rootLayout.addView(
+                musicPanel.getView(),
                 new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         Gravity.CENTER
-                );
-
-        rootLayout.addView(musicPanel, panelParams);
+                )
+        );
     }
 
     private void showMusicLibrary() {
@@ -518,13 +407,13 @@ public class MainActivity extends Activity {
         loadAudioFiles();
         updateMusicLibrary();
 
-        musicPanel.setVisibility(View.VISIBLE);
-        musicPanel.bringToFront();
+        musicPanel.getView().setVisibility(View.VISIBLE);
+        musicPanel.getView().bringToFront();
     }
 
     private void hideMusicLibrary() {
         musicVisible = false;
-        musicPanel.setVisibility(View.GONE);
+        musicPanel.getView().setVisibility(View.GONE);
 
         settingsButton.bringToFront();
         musicButton.bringToFront();
@@ -546,18 +435,18 @@ public class MainActivity extends Activity {
     }
 
     private void updateMusicLibrary() {
-        if (musicListLayout == null) {
+        if (musicPanel.listLayout == null) {
             return;
         }
 
         loadAudioFiles();
 
-        musicListLayout.removeAllViews();
+        musicPanel.listLayout.removeAllViews();
 
         if (audioFiles.isEmpty()) {
-            musicEmptyText.setVisibility(View.VISIBLE);
+            musicPanel.emptyText.setVisibility(View.VISIBLE);
         } else {
-            musicEmptyText.setVisibility(View.GONE);
+            musicPanel.emptyText.setVisibility(View.GONE);
         }
 
         for (int i = 0; i < audioFiles.size(); i++) {
@@ -632,7 +521,7 @@ public class MainActivity extends Activity {
                     }
             );
 
-            musicListLayout.addView(
+            musicPanel.listLayout.addView(
                     row,
                     new LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -643,7 +532,7 @@ public class MainActivity extends Activity {
             View separator = new View(this);
             separator.setBackgroundColor(Color.DKGRAY);
 
-            musicListLayout.addView(
+            musicPanel.listLayout.addView(
                     separator,
                     new LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -679,18 +568,18 @@ public class MainActivity extends Activity {
     }
 
     private void updateNowPlayingLabel() {
-        if (musicNowPlayingText == null) {
+        if (musicPanel.nowPlayingText == null) {
             return;
         }
 
         if (settingsManager.selectedAudioName == null
                 || settingsManager.selectedAudioName.length() == 0) {
-            musicNowPlayingText.setText(
+            musicPanel.nowPlayingText.setText(
                     "選択中の曲：なし\n"
                             + "曲をタップして選択してください。"
             );
         } else {
-            musicNowPlayingText.setText(
+            musicPanel.nowPlayingText.setText(
                     "選択中の曲：" + settingsManager.selectedAudioName
                             + "\n再生：ファイル名順・一覧を繰り返す"
             );
@@ -701,110 +590,27 @@ public class MainActivity extends Activity {
      * Settings screen.
      */
     private void createSettingsPanel() {
-        settingsPanel = new LinearLayout(this);
-        settingsPanel.setOrientation(LinearLayout.VERTICAL);
-        settingsPanel.setGravity(Gravity.CENTER_HORIZONTAL);
-        settingsPanel.setPadding(24, 24, 24, 24);
-        settingsPanel.setBackgroundColor(Color.rgb(30, 30, 30));
-        settingsPanel.setVisibility(View.GONE);
-
-        ScrollView scrollView = new ScrollView(this);
-
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setGravity(Gravity.CENTER_HORIZONTAL);
-
-        TextView title = new TextView(this);
-        title.setText("Signage 設定");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(26);
-        title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 8, 0, 24);
-
-        content.addView(
-                title,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-        );
-
-        TextView slideshowTitle = new TextView(this);
-        slideshowTitle.setText("画像スライドショー");
-        slideshowTitle.setTextColor(Color.WHITE);
-        slideshowTitle.setTextSize(20);
-
-        content.addView(slideshowTitle);
-
-        slideshowStatusText = new TextView(this);
-        slideshowStatusText.setTextColor(Color.LTGRAY);
-        slideshowStatusText.setTextSize(16);
-        slideshowStatusText.setPadding(0, 8, 0, 8);
-
-        content.addView(slideshowStatusText);
-
-        Button toggleButton = new Button(this);
-        toggleButton.setText("スライドショー オン／オフ");
-
-        toggleButton.setOnClickListener(
-                new View.OnClickListener() {
+        settingsPanel = new SettingsPanel(
+                this,
+                new SettingsPanel.Listener() {
                     @Override
-                    public void onClick(View view) {
-                        settingsManager.slideshowEnabled = !settingsManager.slideshowEnabled;
-
+                    public void onToggleSlideshow() {
+                        settingsManager.slideshowEnabled =
+                                !settingsManager.slideshowEnabled;
                         saveSettings();
                         updateSettingsLabels();
                         restartImageTimer();
                     }
-                }
-        );
 
-        content.addView(toggleButton, buttonLayoutParams());
-
-        intervalStatusText = new TextView(this);
-        intervalStatusText.setTextColor(Color.LTGRAY);
-        intervalStatusText.setTextSize(16);
-        intervalStatusText.setPadding(0, 20, 0, 8);
-
-        content.addView(intervalStatusText);
-
-        Button intervalButton = new Button(this);
-        intervalButton.setText("切り替え秒数を変更");
-
-        intervalButton.setOnClickListener(
-                new View.OnClickListener() {
                     @Override
-                    public void onClick(View view) {
+                    public void onChangeInterval() {
                         showIntervalDialog();
                     }
-                }
-        );
 
-        content.addView(intervalButton, buttonLayoutParams());
-
-        TextView audioTitle = new TextView(this);
-        audioTitle.setText("\n音楽再生");
-        audioTitle.setTextColor(Color.WHITE);
-        audioTitle.setTextSize(20);
-
-        content.addView(audioTitle);
-
-        audioStatusText = new TextView(this);
-        audioStatusText.setTextColor(Color.LTGRAY);
-        audioStatusText.setTextSize(16);
-        audioStatusText.setPadding(0, 8, 0, 8);
-
-        content.addView(audioStatusText);
-
-        Button audioToggleButton = new Button(this);
-        audioToggleButton.setText("音楽 オン／オフ");
-
-        audioToggleButton.setOnClickListener(
-                new View.OnClickListener() {
                     @Override
-                    public void onClick(View view) {
-                        settingsManager.audioEnabled = !settingsManager.audioEnabled;
-
+                    public void onToggleAudio() {
+                        settingsManager.audioEnabled =
+                                !settingsManager.audioEnabled;
                         saveSettings();
                         updateSettingsLabels();
 
@@ -814,98 +620,24 @@ public class MainActivity extends Activity {
                             stopAudioPlayback();
                         }
                     }
-                }
-        );
 
-        content.addView(
-                audioToggleButton,
-                buttonLayoutParams()
-        );
-
-        TextView playbackInfo = new TextView(this);
-        playbackInfo.setText(
-                "\n再生方法\n"
-                        + "・曲一覧のファイル名順\n"
-                        + "・最後の曲の次は先頭へ戻る\n"
-                        + "・音楽一覧から曲を選択\n"
-                        + "・選択曲は設定に保存"
-        );
-        playbackInfo.setTextColor(Color.LTGRAY);
-        playbackInfo.setTextSize(16);
-        playbackInfo.setPadding(0, 12, 0, 16);
-
-        content.addView(
-                playbackInfo,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-        );
-
-        TextView futureTitle = new TextView(this);
-        futureTitle.setText(
-                "\n今後追加する機能\n"
-                        + "・背景動画\n"
-                        + "・画像の選択\n"
-                        + "・文字表示の設定"
-        );
-        futureTitle.setTextColor(Color.LTGRAY);
-        futureTitle.setTextSize(17);
-        futureTitle.setPadding(0, 16, 0, 16);
-
-        content.addView(
-                futureTitle,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-        );
-
-        Button closeButton = new Button(this);
-        closeButton.setText("設定を閉じる");
-
-        closeButton.setOnClickListener(
-                new View.OnClickListener() {
                     @Override
-                    public void onClick(View view) {
+                    public void onClose() {
                         hideSettings();
                     }
                 }
         );
-
-        content.addView(closeButton, buttonLayoutParams());
-
-        scrollView.addView(content);
-
-        settingsPanel.addView(
-                scrollView,
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        0,
-                        1
-                )
-        );
-
-        FrameLayout.LayoutParams panelParams =
+        rootLayout.addView(
+                settingsPanel.getView(),
                 new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         Gravity.CENTER
-                );
-
-        rootLayout.addView(settingsPanel, panelParams);
+                )
+        );
     }
 
-    private LinearLayout.LayoutParams buttonLayoutParams() {
-        LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                );
-
-        params.setMargins(0, 6, 0, 6);
-        return params;
-    }
+    
 
     private void showSettings() {
         settingsVisible = true;
@@ -914,13 +646,13 @@ public class MainActivity extends Activity {
 
         updateSettingsLabels();
 
-        settingsPanel.setVisibility(View.VISIBLE);
-        settingsPanel.bringToFront();
+        settingsPanel.getView().setVisibility(View.VISIBLE);
+        settingsPanel.getView().bringToFront();
     }
 
     private void hideSettings() {
         settingsVisible = false;
-        settingsPanel.setVisibility(View.GONE);
+        settingsPanel.getView().setVisibility(View.GONE);
 
         settingsButton.bringToFront();
         musicButton.bringToFront();
@@ -942,20 +674,20 @@ public class MainActivity extends Activity {
     }
 
     private void updateSettingsLabels() {
-        if (slideshowStatusText != null) {
-            slideshowStatusText.setText(
+        if (settingsPanel.slideshowStatusText != null) {
+            settingsPanel.slideshowStatusText.setText(
                     "状態：" + (settingsManager.slideshowEnabled ? "オン" : "オフ")
             );
         }
 
-        if (intervalStatusText != null) {
-            intervalStatusText.setText(
+        if (settingsPanel.intervalStatusText != null) {
+            settingsPanel.intervalStatusText.setText(
                     "切り替え間隔：" + settingsManager.slideshowSeconds + " 秒"
             );
         }
 
-        if (audioStatusText != null) {
-            audioStatusText.setText(
+        if (settingsPanel.audioStatusText != null) {
+            settingsPanel.audioStatusText.setText(
                     "状態：" + (settingsManager.audioEnabled ? "オン" : "オフ")
                             + "\n音楽ファイル数：" + audioFiles.size()
                             + "\n選択中：" + getSelectedAudioDisplayName()

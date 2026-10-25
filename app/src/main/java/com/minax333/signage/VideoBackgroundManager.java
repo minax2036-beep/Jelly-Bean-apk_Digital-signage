@@ -29,6 +29,8 @@ public final class VideoBackgroundManager {
     private int videoIndex = 0;
     private int failedAttempts = 0;
     private boolean released = false;
+    private boolean playbackRequested = false;
+    private String currentVideoPath = null;
 
     public VideoBackgroundManager(
             Activity activity,
@@ -89,12 +91,21 @@ public final class VideoBackgroundManager {
             videoIndex = 0;
         }
 
+        File selectedFile = videoFiles.get(videoIndex);
+        if (playbackRequested
+                && selectedFile.getAbsolutePath().equals(currentVideoPath)
+                && videoView.getVisibility() == View.VISIBLE) {
+            return;
+        }
+
         failedAttempts = 0;
         playCurrentVideo();
     }
 
     public void stop() {
         released = true;
+        playbackRequested = false;
+        currentVideoPath = null;
         try {
             videoView.stopPlayback();
         } catch (IllegalStateException ignored) {
@@ -147,8 +158,12 @@ public final class VideoBackgroundManager {
 
         File file = videoFiles.get(videoIndex);
         try {
+            currentVideoPath = file.getAbsolutePath();
+            playbackRequested = true;
             videoView.setVideoURI(Uri.fromFile(file));
             videoView.requestFocus();
+            videoView.requestLayout();
+            videoView.invalidate();
         } catch (IllegalArgumentException exception) {
             failedAttempts++;
             playNextVideo();

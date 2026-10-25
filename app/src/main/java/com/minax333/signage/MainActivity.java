@@ -7,8 +7,6 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Environment;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -24,7 +22,6 @@ import android.widget.TextView;
 import android.media.MediaPlayer;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -59,10 +56,8 @@ public class MainActivity extends Activity {
     private final SimpleDateFormat dateFormat =
             new SimpleDateFormat("yyyy/MM/dd", Locale.getDefault());
 
-    private final List<File> imageFiles = new ArrayList<File>();
     private final List<File> audioFiles = new ArrayList<File>();
 
-    private int imageIndex = 0;
     private int audioIndex = 0;
 
     private float touchStartX;
@@ -74,6 +69,7 @@ public class MainActivity extends Activity {
 
 
     private boolean audioPreparing = false;
+    private SlideshowManager slideshowManager;
 
 
 
@@ -106,38 +102,6 @@ public class MainActivity extends Activity {
         }
     };
 
-    private final Runnable imageRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (!running || settingsVisible
-                    || musicVisible || !settingsManager.slideshowEnabled) {
-                return;
-            }
-
-            loadImages();
-
-            if (!imageFiles.isEmpty()) {
-                if (imageIndex >= imageFiles.size()) {
-                    imageIndex = 0;
-                }
-
-                if (imageFiles.size() > 1) {
-                    imageIndex++;
-
-                    if (imageIndex >= imageFiles.size()) {
-                        imageIndex = 0;
-                    }
-                }
-
-                showImage(imageFiles.get(imageIndex));
-            } else {
-                showStandby();
-            }
-
-            scheduleNextImage();
-        }
-    };
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -155,15 +119,8 @@ public class MainActivity extends Activity {
         createLayout();
 
         updateClock();
-        loadImages();
+        slideshowManager.showFirstImageOrStandby();
         loadAudioFiles();
-
-        if (imageFiles.isEmpty()) {
-            showStandby();
-        } else {
-            imageIndex = 0;
-            showImage(imageFiles.get(imageIndex));
-        }
 
         updateSettingsLabels();
         updateMusicLibrary();
@@ -251,6 +208,32 @@ public class MainActivity extends Activity {
                 );
 
         rootLayout.addView(clockTextView, clockParams);
+
+        slideshowManager = new SlideshowManager(
+                this,
+                handler,
+                settingsManager,
+                imageView,
+                statusTextView,
+                clockTextView,
+                dateTextView,
+                new SlideshowManager.StateProvider() {
+                    @Override
+                    public boolean isRunning() {
+                        return running;
+                    }
+
+                    @Override
+                    public boolean isSettingsVisible() {
+                        return settingsVisible;
+                    }
+
+                    @Override
+                    public boolean isMusicVisible() {
+                        return musicVisible;
+                    }
+                }
+        );
 
         /*
          * Settings button.
@@ -402,7 +385,7 @@ public class MainActivity extends Activity {
 
         musicVisible = true;
 
-        handler.removeCallbacks(imageRunnable);
+        slideshowManager.stopTimer();
 
         loadAudioFiles();
         updateMusicLibrary();
@@ -419,19 +402,8 @@ public class MainActivity extends Activity {
         musicButton.bringToFront();
 
         updateClock();
-        loadImages();
-
-        if (imageFiles.isEmpty()) {
-            showStandby();
-        } else {
-            if (imageIndex >= imageFiles.size()) {
-                imageIndex = 0;
-            }
-
-            showImage(imageFiles.get(imageIndex));
-        }
-
-        scheduleNextImage();
+        slideshowManager.showCurrentImageOrStandby();
+        slideshowManager.scheduleNextImage();
     }
 
     private void updateMusicLibrary() {
@@ -642,7 +614,7 @@ public class MainActivity extends Activity {
     private void showSettings() {
         settingsVisible = true;
 
-        handler.removeCallbacks(imageRunnable);
+        slideshowManager.stopTimer();
 
         updateSettingsLabels();
 
@@ -658,19 +630,8 @@ public class MainActivity extends Activity {
         musicButton.bringToFront();
 
         updateClock();
-        loadImages();
-
-        if (imageFiles.isEmpty()) {
-            showStandby();
-        } else {
-            if (imageIndex >= imageFiles.size()) {
-                imageIndex = 0;
-            }
-
-            showImage(imageFiles.get(imageIndex));
-        }
-
-        scheduleNextImage();
+        slideshowManager.showCurrentImageOrStandby();
+        slideshowManager.scheduleNextImage();
     }
 
     private void updateSettingsLabels() {
@@ -744,24 +705,7 @@ public class MainActivity extends Activity {
     }
 
     private void restartImageTimer() {
-        handler.removeCallbacks(imageRunnable);
-
-        if (running && !settingsVisible
-                && !musicVisible && settingsManager.slideshowEnabled) {
-            scheduleNextImage();
-        }
-    }
-
-    private void scheduleNextImage() {
-        handler.removeCallbacks(imageRunnable);
-
-        if (running && !settingsVisible
-                && !musicVisible && settingsManager.slideshowEnabled) {
-            handler.postDelayed(
-                    imageRunnable,
-                    settingsManager.slideshowSeconds * 1000L
-            );
-        }
+        slideshowManager.restartTimer();
     }
 
     private void updateClock() {
@@ -769,41 +713,6 @@ public class MainActivity extends Activity {
 
         clockTextView.setText(timeFormat.format(now));
         dateTextView.setText(dateFormat.format(now));
-    }
-
-    /*
-     * Image file discovery.
-     */
-    private void loadImages() {
-        imageFiles.clear();
-
-        List<File> directories = MediaFileUtils.findDirectories("images");
-
-        for (File directory : directories) {
-            File[] files = directory.listFiles();
-
-            if (files == null) {
-                continue;
-            }
-
-            Arrays.sort(files, new java.util.Comparator<File>() {
-                @Override
-                public int compare(File a, File b) {
-                    return a.getName().compareToIgnoreCase(b.getName());
-                }
-            });
-
-            for (File file : files) {
-                if (file.isFile() && MediaFileUtils.isImageFile(file)
-                        && !imageFiles.contains(file)) {
-                    imageFiles.add(file);
-                }
-            }
-        }
-
-        if (imageIndex >= imageFiles.size()) {
-            imageIndex = 0;
-        }
     }
 
     /*
@@ -880,85 +789,6 @@ public class MainActivity extends Activity {
         }
 
         return -1;
-    }
-
-                        /*
-     * Image display.
-     */
-    private void showImage(File file) {
-        Bitmap bitmap = decodeImage(file);
-
-        if (bitmap == null) {
-            imageView.setImageDrawable(null);
-            showStandby();
-            return;
-        }
-
-        imageView.setImageBitmap(bitmap);
-        statusTextView.setVisibility(View.GONE);
-
-        clockTextView.setVisibility(View.VISIBLE);
-        dateTextView.setVisibility(View.VISIBLE);
-    }
-
-    private Bitmap decodeImage(File file) {
-        BitmapFactory.Options options =
-                new BitmapFactory.Options();
-
-        options.inJustDecodeBounds = true;
-
-        BitmapFactory.decodeFile(
-                file.getAbsolutePath(),
-                options
-        );
-
-        if (options.outWidth <= 0 || options.outHeight <= 0) {
-            return null;
-        }
-
-        int maxDimension = 2048;
-        int sampleSize = 1;
-
-        while (options.outWidth / sampleSize > maxDimension
-                || options.outHeight / sampleSize > maxDimension) {
-            sampleSize *= 2;
-        }
-
-        options.inJustDecodeBounds = false;
-        options.inSampleSize = sampleSize;
-
-        FileInputStream input = null;
-
-        try {
-            input = new FileInputStream(file);
-
-            return BitmapFactory.decodeStream(
-                    input,
-                    null,
-                    options
-            );
-        } catch (IOException e) {
-            return null;
-        } catch (OutOfMemoryError e) {
-            return null;
-        } finally {
-            if (input != null) {
-                try {
-                    input.close();
-                } catch (IOException ignored) {
-                }
-            }
-        }
-    }
-
-    private void showStandby() {
-        imageView.setImageDrawable(null);
-
-        statusTextView.setText("Signage\n画像待機中");
-        statusTextView.setVisibility(View.VISIBLE);
-
-        clockTextView.setVisibility(View.VISIBLE);
-        dateTextView.setVisibility(View.VISIBLE);
     }
 
     /*
@@ -1192,26 +1022,19 @@ public class MainActivity extends Activity {
         running = true;
 
         handler.removeCallbacks(clockRunnable);
-        handler.removeCallbacks(imageRunnable);
+        slideshowManager.stopTimer();
 
         loadSettings();
         updateClock();
 
-        loadImages();
+        slideshowManager.showFirstImageOrStandby();
         loadAudioFiles();
-
-        if (imageFiles.isEmpty()) {
-            showStandby();
-        } else {
-            imageIndex = 0;
-            showImage(imageFiles.get(imageIndex));
-        }
 
         updateSettingsLabels();
         updateMusicLibrary();
 
         handler.postDelayed(clockRunnable, CLOCK_INTERVAL);
-        scheduleNextImage();
+        slideshowManager.scheduleNextImage();
 
         if (settingsManager.audioEnabled) {
             startAudioPlayback();
@@ -1223,7 +1046,7 @@ public class MainActivity extends Activity {
         running = false;
 
         handler.removeCallbacks(clockRunnable);
-        handler.removeCallbacks(imageRunnable);
+        slideshowManager.stopTimer();
 
         stopAudioPlayback();
 
@@ -1235,12 +1058,12 @@ public class MainActivity extends Activity {
         running = false;
 
         handler.removeCallbacks(clockRunnable);
-        handler.removeCallbacks(imageRunnable);
+        slideshowManager.stopTimer();
 
         stopAudioPlayback();
 
-        if (imageView != null) {
-            imageView.setImageDrawable(null);
+        if (slideshowManager != null) {
+            slideshowManager.clearDisplayedImage();
         }
 
         super.onDestroy();

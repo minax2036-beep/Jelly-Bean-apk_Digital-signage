@@ -18,12 +18,14 @@ public final class SettingsPanel {
 
     public interface Listener {
         void onToggleSlideshow();
+        void onToggleDisplayMode();
         void onChangeInterval();
         void onToggleAudio();
         void onClose();
     }
 
     private final LinearLayout panel;
+    public final TextView displayModeStatusText;
     public final TextView slideshowStatusText;
     public final TextView intervalStatusText;
     public final TextView audioStatusText;
@@ -48,6 +50,29 @@ public final class SettingsPanel {
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, 8, 0, 24);
         content.addView(title, matchWrapParams());
+
+        TextView displayModeTitle = new TextView(activity);
+        displayModeTitle.setText("背景表示モード");
+        displayModeTitle.setTextColor(Color.WHITE);
+        displayModeTitle.setTextSize(20);
+        displayModeTitle.setPadding(0, 8, 0, 0);
+        content.addView(displayModeTitle);
+
+        displayModeStatusText = new TextView(activity);
+        displayModeStatusText.setTextColor(Color.LTGRAY);
+        displayModeStatusText.setTextSize(16);
+        displayModeStatusText.setPadding(0, 8, 0, 8);
+        content.addView(displayModeStatusText);
+
+        Button displayModeButton = new Button(activity);
+        displayModeButton.setText("画像／動画を切り替え");
+        displayModeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                listener.onToggleDisplayMode();
+            }
+        });
+        content.addView(displayModeButton, buttonParams());
 
         TextView slideshowTitle = new TextView(activity);
         slideshowTitle.setText("画像スライドショー");

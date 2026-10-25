@@ -1091,7 +1091,7 @@ public class MainActivity extends Activity {
     private void loadImages() {
         imageFiles.clear();
 
-        List<File> directories = findDirectories("images");
+        List<File> directories = MediaFileUtils.findDirectories("images");
 
         for (File directory : directories) {
             File[] files = directory.listFiles();
@@ -1108,7 +1108,7 @@ public class MainActivity extends Activity {
             });
 
             for (File file : files) {
-                if (file.isFile() && isImageFile(file)
+                if (file.isFile() && MediaFileUtils.isImageFile(file)
                         && !imageFiles.contains(file)) {
                     imageFiles.add(file);
                 }
@@ -1126,7 +1126,7 @@ public class MainActivity extends Activity {
     private void loadAudioFiles() {
         audioFiles.clear();
 
-        List<File> directories = findDirectories("audio");
+        List<File> directories = MediaFileUtils.findDirectories("audio");
 
         for (File directory : directories) {
             File[] files = directory.listFiles();
@@ -1143,7 +1143,7 @@ public class MainActivity extends Activity {
             });
 
             for (File file : files) {
-                if (file.isFile() && isAudioFile(file)
+                if (file.isFile() && MediaFileUtils.isAudioFile(file)
                         && !audioFiles.contains(file)) {
                     audioFiles.add(file);
                 }
@@ -1196,86 +1196,7 @@ public class MainActivity extends Activity {
         return -1;
     }
 
-    private List<File> findDirectories(String folderName) {
-        List<File> result = new ArrayList<File>();
-        List<File> roots = new ArrayList<File>();
-
-        addRoot(roots, Environment.getExternalStorageDirectory());
-        addRoot(roots, new File("/sdcard"));
-        addRoot(roots, new File("/storage"));
-        addRoot(roots, new File("/mnt"));
-        addRoot(roots, new File("/mnt/media_rw"));
-
-        for (File root : roots) {
-            addMediaDirectory(
-                    result,
-                    new File(root, "signage/" + folderName)
-            );
-
-            File[] children = root.listFiles();
-
-            if (children == null) {
-                continue;
-            }
-
-            for (File child : children) {
-                if (child.isDirectory()) {
-                    addMediaDirectory(
-                            result,
-                            new File(
-                                    child,
-                                    "signage/" + folderName
-                            )
-                    );
-                }
-            }
-        }
-
-        return result;
-    }
-
-    private void addRoot(List<File> roots, File root) {
-        if (root != null
-                && root.isDirectory()
-                && !roots.contains(root)) {
-            roots.add(root);
-        }
-    }
-
-    private void addMediaDirectory(
-            List<File> directories,
-            File directory
-    ) {
-        if (directory.isDirectory()
-                && directory.canRead()
-                && !directories.contains(directory)) {
-            directories.add(directory);
-        }
-    }
-
-    private boolean isImageFile(File file) {
-        String name = file.getName().toLowerCase(Locale.US);
-
-        return name.endsWith(".jpg")
-                || name.endsWith(".jpeg")
-                || name.endsWith(".png")
-                || name.endsWith(".webp")
-                || name.endsWith(".bmp")
-                || name.endsWith(".gif");
-    }
-
-    private boolean isAudioFile(File file) {
-        String name = file.getName().toLowerCase(Locale.US);
-
-        return name.endsWith(".mp3")
-                || name.endsWith(".m4a")
-                || name.endsWith(".aac")
-                || name.endsWith(".ogg")
-                || name.endsWith(".wav")
-                || name.endsWith(".3gp");
-    }
-
-    /*
+                        /*
      * Image display.
      */
     private void showImage(File file) {

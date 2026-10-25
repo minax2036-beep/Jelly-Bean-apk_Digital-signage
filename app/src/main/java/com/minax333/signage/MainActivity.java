@@ -19,6 +19,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.VideoView;
 import android.media.MediaPlayer;
 
 import java.io.File;
@@ -34,6 +35,8 @@ public class MainActivity extends Activity {
 
     private FrameLayout rootLayout;
     private ImageView imageView;
+    private VideoView videoView;
+    private VideoBackgroundManager videoBackgroundManager;
     private TextView clockTextView;
     private TextView dateTextView;
     private TextView statusTextView;
@@ -119,8 +122,12 @@ public class MainActivity extends Activity {
         createLayout();
 
         updateClock();
-        slideshowManager.showFirstImageOrStandby();
         loadAudioFiles();
+        if (settingsManager.videoMode) {
+            applyDisplayMode();
+        } else {
+            slideshowManager.showFirstImageOrStandby();
+        }
 
         updateSettingsLabels();
         updateMusicLibrary();
@@ -147,6 +154,17 @@ public class MainActivity extends Activity {
 
         rootLayout.addView(
                 imageView,
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                )
+        );
+
+        videoView = new VideoView(this);
+        videoView.setBackgroundColor(Color.BLACK);
+        videoView.setVisibility(View.GONE);
+        rootLayout.addView(
+                videoView,
                 new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
@@ -231,6 +249,24 @@ public class MainActivity extends Activity {
                     @Override
                     public boolean isMusicVisible() {
                         return musicVisible;
+                    }
+                }
+        );
+
+        videoBackgroundManager = new VideoBackgroundManager(
+                this,
+                videoView,
+                new VideoBackgroundManager.Listener() {
+                    @Override
+                    public void onNoVideosFound() {
+                        if (settingsManager.videoMode) {
+                            settingsManager.videoMode = false;
+                            saveSettings();
+                            updateSettingsLabels();
+                            applyDisplayMode();
+                            statusTextView.setText("動画が見つからないため画像モードに切り替えました");
+                            statusTextView.setVisibility(View.VISIBLE);
+                        }
                     }
                 }
         );
@@ -402,8 +438,7 @@ public class MainActivity extends Activity {
         musicButton.bringToFront();
 
         updateClock();
-        slideshowManager.showCurrentImageOrStandby();
-        slideshowManager.scheduleNextImage();
+        applyDisplayMode();
     }
 
     private void updateMusicLibrary() {
@@ -575,6 +610,14 @@ public class MainActivity extends Activity {
                     }
 
                     @Override
+                    public void onToggleDisplayMode() {
+                        settingsManager.videoMode = !settingsManager.videoMode;
+                        saveSettings();
+                        updateSettingsLabels();
+                        applyDisplayMode();
+                    }
+
+                    @Override
                     public void onChangeInterval() {
                         showIntervalDialog();
                     }
@@ -630,11 +673,17 @@ public class MainActivity extends Activity {
         musicButton.bringToFront();
 
         updateClock();
-        slideshowManager.showCurrentImageOrStandby();
-        slideshowManager.scheduleNextImage();
+        applyDisplayMode();
     }
 
     private void updateSettingsLabels() {
+        if (settingsPanel.displayModeStatusText != null) {
+            settingsPanel.displayModeStatusText.setText(
+                    "現在：" + (settingsManager.videoMode ? "動画プレイヤー" : "画像スライドショー")
+                            + "\\n初期設定：画像スライドショー"
+            );
+        }
+
         if (settingsPanel.slideshowStatusText != null) {
             settingsPanel.slideshowStatusText.setText(
                     "状態：" + (settingsManager.slideshowEnabled ? "オン" : "オフ")
@@ -705,7 +754,33 @@ public class MainActivity extends Activity {
     }
 
     private void restartImageTimer() {
-        slideshowManager.restartTimer();
+        if (!settingsManager.videoMode) {
+            slideshowManager.restartTimer();
+        }
+    }
+
+    private void applyDisplayMode() {
+        if (videoBackgroundManager == null || slideshowManager == null) {
+            return;
+        }
+
+        if (settingsManager.videoMode) {
+            slideshowManager.stopTimer();
+            stopAudioPlayback();
+            imageView.setVisibility(View.GONE);
+            videoView.setVisibility(View.VISIBLE);
+            videoBackgroundManager.start();
+        } else {
+            videoBackgroundManager.stop();
+            videoView.setVisibility(View.GONE);
+            imageView.setVisibility(View.VISIBLE);
+            slideshowManager.showCurrentImageOrStandby();
+            slideshowManager.scheduleNextImage();
+
+            if (running && settingsManager.audioEnabled) {
+                startAudioPlayback();
+            }
+        }
     }
 
     private void updateClock() {
@@ -1034,9 +1109,13 @@ public class MainActivity extends Activity {
         updateMusicLibrary();
 
         handler.postDelayed(clockRunnable, CLOCK_INTERVAL);
-        slideshowManager.scheduleNextImage();
+        if (settingsManager.videoMode) {
+            applyDisplayMode();
+        } else {
+            slideshowManager.scheduleNextImage();
+        }
 
-        if (settingsManager.audioEnabled) {
+        if (!settingsManager.videoMode && settingsManager.audioEnabled) {
             startAudioPlayback();
         }
     }
@@ -1047,6 +1126,9 @@ public class MainActivity extends Activity {
 
         handler.removeCallbacks(clockRunnable);
         slideshowManager.stopTimer();
+        if (videoBackgroundManager != null) {
+            videoBackgroundManager.stop();
+        }
 
         stopAudioPlayback();
 
@@ -1064,6 +1146,9 @@ public class MainActivity extends Activity {
 
         if (slideshowManager != null) {
             slideshowManager.clearDisplayedImage();
+        }
+        if (videoBackgroundManager != null) {
+            videoBackgroundManager.release();
         }
 
         super.onDestroy();

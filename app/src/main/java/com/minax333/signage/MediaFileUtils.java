@@ -84,6 +84,17 @@ public final class MediaFileUtils {
                     || name.endsWith(".gif");
         }
 
+    public static boolean isVideoFile(File file) {
+            String name = file.getName().toLowerCase(Locale.US);
+
+            return name.endsWith(".mp4")
+                    || name.endsWith(".3gp")
+                    || name.endsWith(".m4v")
+                    || name.endsWith(".webm")
+                    || name.endsWith(".mkv")
+                    || name.endsWith(".avi");
+        }
+
     public static boolean isAudioFile(File file) {
             String name = file.getName().toLowerCase(Locale.US);
     

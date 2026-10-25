@@ -123,9 +123,9 @@ public class MainActivity extends Activity {
 
         updateClock();
         loadAudioFiles();
-        if (settingsManager.videoMode) {
-            applyDisplayMode();
-        } else {
+        // Video playback starts in onResume(), after the Activity is active.
+        // Starting VideoView here as well can create overlapping playback sessions.
+        if (!settingsManager.videoMode) {
             slideshowManager.showFirstImageOrStandby();
         }
 
@@ -1101,21 +1101,18 @@ public class MainActivity extends Activity {
         updateClock();
 
         loadAudioFiles();
+
         if (settingsManager.videoMode) {
             applyDisplayMode();
         } else {
             slideshowManager.showFirstImageOrStandby();
+            slideshowManager.scheduleNextImage();
         }
 
         updateSettingsLabels();
         updateMusicLibrary();
 
         handler.postDelayed(clockRunnable, CLOCK_INTERVAL);
-        if (settingsManager.videoMode) {
-            applyDisplayMode();
-        } else {
-            slideshowManager.scheduleNextImage();
-        }
 
         if (!settingsManager.videoMode && settingsManager.audioEnabled) {
             startAudioPlayback();

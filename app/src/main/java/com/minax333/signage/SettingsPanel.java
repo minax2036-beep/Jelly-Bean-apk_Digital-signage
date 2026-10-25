@@ -1,0 +1,163 @@
+package com.minax333.signage;
+
+import android.app.Activity;
+import android.graphics.Color;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+/**
+ * Builds the settings UI. Settings behavior is delegated to MainActivity.
+ */
+public final class SettingsPanel {
+
+    public interface Listener {
+        void onToggleSlideshow();
+        void onChangeInterval();
+        void onToggleAudio();
+        void onClose();
+    }
+
+    private final LinearLayout panel;
+    public final TextView slideshowStatusText;
+    public final TextView intervalStatusText;
+    public final TextView audioStatusText;
+
+    public SettingsPanel(Activity activity, final Listener listener) {
+        panel = new LinearLayout(activity);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_HORIZONTAL);
+        panel.setPadding(24, 24, 24, 24);
+        panel.setBackgroundColor(Color.rgb(30, 30, 30));
+        panel.setVisibility(View.GONE);
+
+        ScrollView scrollView = new ScrollView(activity);
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        TextView title = new TextView(activity);
+        title.setText("Signage 設定");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(26);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, 8, 0, 24);
+        content.addView(title, matchWrapParams());
+
+        TextView slideshowTitle = new TextView(activity);
+        slideshowTitle.setText("画像スライドショー");
+        slideshowTitle.setTextColor(Color.WHITE);
+        slideshowTitle.setTextSize(20);
+        content.addView(slideshowTitle);
+
+        slideshowStatusText = new TextView(activity);
+        slideshowStatusText.setTextColor(Color.LTGRAY);
+        slideshowStatusText.setTextSize(16);
+        slideshowStatusText.setPadding(0, 8, 0, 8);
+        content.addView(slideshowStatusText);
+
+        Button toggleButton = new Button(activity);
+        toggleButton.setText("スライドショー オン／オフ");
+        toggleButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                listener.onToggleSlideshow();
+            }
+        });
+        content.addView(toggleButton, buttonParams());
+
+        intervalStatusText = new TextView(activity);
+        intervalStatusText.setTextColor(Color.LTGRAY);
+        intervalStatusText.setTextSize(16);
+        intervalStatusText.setPadding(0, 20, 0, 8);
+        content.addView(intervalStatusText);
+
+        Button intervalButton = new Button(activity);
+        intervalButton.setText("切り替え秒数を変更");
+        intervalButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                listener.onChangeInterval();
+            }
+        });
+        content.addView(intervalButton, buttonParams());
+
+        TextView audioTitle = new TextView(activity);
+        audioTitle.setText("\n音楽再生");
+        audioTitle.setTextColor(Color.WHITE);
+        audioTitle.setTextSize(20);
+        content.addView(audioTitle);
+
+        audioStatusText = new TextView(activity);
+        audioStatusText.setTextColor(Color.LTGRAY);
+        audioStatusText.setTextSize(16);
+        audioStatusText.setPadding(0, 8, 0, 8);
+        content.addView(audioStatusText);
+
+        Button audioToggleButton = new Button(activity);
+        audioToggleButton.setText("音楽 オン／オフ");
+        audioToggleButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                listener.onToggleAudio();
+            }
+        });
+        content.addView(audioToggleButton, buttonParams());
+
+        TextView playbackInfo = new TextView(activity);
+        playbackInfo.setText("\n再生方法\n"
+                + "・曲一覧のファイル名順\n"
+                + "・最後の曲の次は先頭へ戻る\n"
+                + "・音楽一覧から曲を選択\n"
+                + "・選択曲は設定に保存");
+        playbackInfo.setTextColor(Color.LTGRAY);
+        playbackInfo.setTextSize(16);
+        playbackInfo.setPadding(0, 12, 0, 16);
+        content.addView(playbackInfo, matchWrapParams());
+
+        TextView futureTitle = new TextView(activity);
+        futureTitle.setText("\n今後追加する機能\n"
+                + "・背景動画\n"
+                + "・画像の選択\n"
+                + "・文字表示の設定");
+        futureTitle.setTextColor(Color.LTGRAY);
+        futureTitle.setTextSize(17);
+        futureTitle.setPadding(0, 16, 0, 16);
+        content.addView(futureTitle, matchWrapParams());
+
+        Button closeButton = new Button(activity);
+        closeButton.setText("設定を閉じる");
+        closeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                listener.onClose();
+            }
+        });
+        content.addView(closeButton, buttonParams());
+
+        scrollView.addView(content);
+        panel.addView(scrollView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+    }
+
+    public View getView() {
+        return panel;
+    }
+
+    private LinearLayout.LayoutParams buttonParams() {
+        LinearLayout.LayoutParams params = matchWrapParams();
+        params.setMargins(0, 6, 0, 6);
+        return params;
+    }
+
+    private LinearLayout.LayoutParams matchWrapParams() {
+        return new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+}

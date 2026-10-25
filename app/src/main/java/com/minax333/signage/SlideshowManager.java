@@ -240,7 +240,7 @@ public final class SlideshowManager {
 
     private void showStandby() {
         imageView.setImageDrawable(null);
-        statusTextView.setText("Signage\\n画像待機中");
+        statusTextView.setText("Signage\n画像待機中");
         statusTextView.setVisibility(View.VISIBLE);
         clockTextView.setVisibility(View.VISIBLE);
         dateTextView.setVisibility(View.VISIBLE);

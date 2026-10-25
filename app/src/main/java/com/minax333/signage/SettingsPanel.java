@@ -146,10 +146,10 @@ public final class SettingsPanel {
         content.addView(playbackInfo, matchWrapParams());
 
         TextView futureTitle = new TextView(activity);
-        futureTitle.setText("\n今後追加する機能\n"
-                + "・背景動画\n"
-                + "・画像の選択\n"
-                + "・文字表示の設定");
+        futureTitle.setText("\\nメディアフォルダー\\n"
+                + "画像：signage/images/\\n"
+                + "動画：signage/videos/\\n"
+                + "動画は端末が対応する形式で保存してください。");
         futureTitle.setTextColor(Color.LTGRAY);
         futureTitle.setTextSize(17);
         futureTitle.setPadding(0, 16, 0, 16);

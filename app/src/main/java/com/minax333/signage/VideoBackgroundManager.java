@@ -64,6 +64,7 @@ public final class VideoBackgroundManager {
             @Override
             public void onPrepared(MediaPlayer player) {
                 if (!released && videoView.getVisibility() == View.VISIBLE) {
+                    failedAttempts = 0;
                     try {
                         player.setLooping(false);
                         videoView.start();

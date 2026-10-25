@@ -57,6 +57,7 @@ public class MainActivity extends Activity {
     private final Handler handler = new Handler();
 
     private SharedPreferences preferences;
+    private final SettingsManager settingsManager = new SettingsManager();
     private MediaPlayer mediaPlayer;
 
     private final SimpleDateFormat timeFormat =
@@ -77,27 +78,23 @@ public class MainActivity extends Activity {
     private boolean running = false;
     private boolean settingsVisible = false;
     private boolean musicVisible = false;
-    private boolean slideshowEnabled = true;
-    private boolean audioEnabled = false;
+
+
     private boolean audioPreparing = false;
 
-    private int slideshowSeconds = 10;
 
-    private String selectedAudioName = "";
 
-    private static final String PREFS_NAME = "signage_settings";
 
-    private static final String KEY_SLIDESHOW_ENABLED =
-            "slideshow_enabled";
 
-    private static final String KEY_SLIDESHOW_SECONDS =
-            "slideshow_seconds";
 
-    private static final String KEY_AUDIO_ENABLED =
-            "audio_enabled";
 
-    private static final String KEY_SELECTED_AUDIO =
-            "selected_audio_name";
+
+
+
+
+
+
+
 
     private static final long CLOCK_INTERVAL = 1000L;
 
@@ -120,7 +117,7 @@ public class MainActivity extends Activity {
         @Override
         public void run() {
             if (!running || settingsVisible
-                    || musicVisible || !slideshowEnabled) {
+                    || musicVisible || !settingsManager.slideshowEnabled) {
                 return;
             }
 
@@ -157,7 +154,7 @@ public class MainActivity extends Activity {
         );
 
         preferences = getSharedPreferences(
-                PREFS_NAME,
+                SettingsManager.PREFS_NAME,
                 MODE_PRIVATE
         );
 
@@ -180,54 +177,11 @@ public class MainActivity extends Activity {
     }
 
     private void loadSettings() {
-        slideshowEnabled = preferences.getBoolean(
-                KEY_SLIDESHOW_ENABLED,
-                true
-        );
-
-        slideshowSeconds = preferences.getInt(
-                KEY_SLIDESHOW_SECONDS,
-                10
-        );
-
-        audioEnabled = preferences.getBoolean(
-                KEY_AUDIO_ENABLED,
-                false
-        );
-
-        selectedAudioName = preferences.getString(
-                KEY_SELECTED_AUDIO,
-                ""
-        );
-
-        if (slideshowSeconds < 1) {
-            slideshowSeconds = 1;
-        }
-
-        if (slideshowSeconds > 3600) {
-            slideshowSeconds = 3600;
-        }
+        settingsManager.load(preferences);
     }
 
     private void saveSettings() {
-        preferences.edit()
-                .putBoolean(
-                        KEY_SLIDESHOW_ENABLED,
-                        slideshowEnabled
-                )
-                .putInt(
-                        KEY_SLIDESHOW_SECONDS,
-                        slideshowSeconds
-                )
-                .putBoolean(
-                        KEY_AUDIO_ENABLED,
-                        audioEnabled
-                )
-                .putString(
-                        KEY_SELECTED_AUDIO,
-                        selectedAudioName
-                )
-                .apply();
+        settingsManager.save(preferences);
     }
 
     private void createLayout() {
@@ -616,7 +570,7 @@ public class MainActivity extends Activity {
             row.setPadding(12, 12, 12, 12);
 
             final boolean selected =
-                    audioFile.getName().equals(selectedAudioName);
+                    audioFile.getName().equals(settingsManager.selectedAudioName);
 
             if (selected) {
                 row.setBackgroundColor(Color.rgb(55, 75, 95));
@@ -709,7 +663,7 @@ public class MainActivity extends Activity {
         }
 
         audioIndex = index;
-        selectedAudioName = audioFiles.get(index).getName();
+        settingsManager.selectedAudioName = audioFiles.get(index).getName();
 
         saveSettings();
         updateMusicLibrary();
@@ -719,7 +673,7 @@ public class MainActivity extends Activity {
          * If music is already enabled, immediately start the
          * selected song. Otherwise, it will play when enabled.
          */
-        if (audioEnabled && running) {
+        if (settingsManager.audioEnabled && running) {
             playAudioAtIndex(audioIndex);
         }
     }
@@ -729,15 +683,15 @@ public class MainActivity extends Activity {
             return;
         }
 
-        if (selectedAudioName == null
-                || selectedAudioName.length() == 0) {
+        if (settingsManager.selectedAudioName == null
+                || settingsManager.selectedAudioName.length() == 0) {
             musicNowPlayingText.setText(
                     "選択中の曲：なし\n"
                             + "曲をタップして選択してください。"
             );
         } else {
             musicNowPlayingText.setText(
-                    "選択中の曲：" + selectedAudioName
+                    "選択中の曲：" + settingsManager.selectedAudioName
                             + "\n再生：ファイル名順・一覧を繰り返す"
             );
         }
@@ -796,7 +750,7 @@ public class MainActivity extends Activity {
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        slideshowEnabled = !slideshowEnabled;
+                        settingsManager.slideshowEnabled = !settingsManager.slideshowEnabled;
 
                         saveSettings();
                         updateSettingsLabels();
@@ -849,12 +803,12 @@ public class MainActivity extends Activity {
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        audioEnabled = !audioEnabled;
+                        settingsManager.audioEnabled = !settingsManager.audioEnabled;
 
                         saveSettings();
                         updateSettingsLabels();
 
-                        if (audioEnabled) {
+                        if (settingsManager.audioEnabled) {
                             startAudioPlayback();
                         } else {
                             stopAudioPlayback();
@@ -990,19 +944,19 @@ public class MainActivity extends Activity {
     private void updateSettingsLabels() {
         if (slideshowStatusText != null) {
             slideshowStatusText.setText(
-                    "状態：" + (slideshowEnabled ? "オン" : "オフ")
+                    "状態：" + (settingsManager.slideshowEnabled ? "オン" : "オフ")
             );
         }
 
         if (intervalStatusText != null) {
             intervalStatusText.setText(
-                    "切り替え間隔：" + slideshowSeconds + " 秒"
+                    "切り替え間隔：" + settingsManager.slideshowSeconds + " 秒"
             );
         }
 
         if (audioStatusText != null) {
             audioStatusText.setText(
-                    "状態：" + (audioEnabled ? "オン" : "オフ")
+                    "状態：" + (settingsManager.audioEnabled ? "オン" : "オフ")
                             + "\n音楽ファイル数：" + audioFiles.size()
                             + "\n選択中：" + getSelectedAudioDisplayName()
             );
@@ -1010,12 +964,12 @@ public class MainActivity extends Activity {
     }
 
     private String getSelectedAudioDisplayName() {
-        if (selectedAudioName == null
-                || selectedAudioName.length() == 0) {
+        if (settingsManager.selectedAudioName == null
+                || settingsManager.selectedAudioName.length() == 0) {
             return "なし";
         }
 
-        return selectedAudioName;
+        return settingsManager.selectedAudioName;
     }
 
     private void showIntervalDialog() {
@@ -1045,7 +999,7 @@ public class MainActivity extends Activity {
                                     DialogInterface dialog,
                                     int which
                             ) {
-                                slideshowSeconds = seconds[which];
+                                settingsManager.slideshowSeconds = seconds[which];
 
                                 saveSettings();
                                 updateSettingsLabels();
@@ -1061,7 +1015,7 @@ public class MainActivity extends Activity {
         handler.removeCallbacks(imageRunnable);
 
         if (running && !settingsVisible
-                && !musicVisible && slideshowEnabled) {
+                && !musicVisible && settingsManager.slideshowEnabled) {
             scheduleNextImage();
         }
     }
@@ -1070,10 +1024,10 @@ public class MainActivity extends Activity {
         handler.removeCallbacks(imageRunnable);
 
         if (running && !settingsVisible
-                && !musicVisible && slideshowEnabled) {
+                && !musicVisible && settingsManager.slideshowEnabled) {
             handler.postDelayed(
                     imageRunnable,
-                    slideshowSeconds * 1000L
+                    settingsManager.slideshowSeconds * 1000L
             );
         }
     }
@@ -1155,9 +1109,9 @@ public class MainActivity extends Activity {
          * This avoids relying on an index that could change
          * if files are added or removed.
          */
-        if (selectedAudioName != null
-                && selectedAudioName.length() > 0) {
-            int foundIndex = findAudioIndex(selectedAudioName);
+        if (settingsManager.selectedAudioName != null
+                && settingsManager.selectedAudioName.length() > 0) {
+            int foundIndex = findAudioIndex(settingsManager.selectedAudioName);
 
             if (foundIndex >= 0) {
                 audioIndex = foundIndex;
@@ -1172,7 +1126,7 @@ public class MainActivity extends Activity {
             }
 
             if (!audioFiles.isEmpty()
-                    && selectedAudioName.length() == 0) {
+                    && settingsManager.selectedAudioName.length() == 0) {
                 audioIndex = 0;
             }
         }
@@ -1282,7 +1236,7 @@ public class MainActivity extends Activity {
      * playback returns to the first track.
      */
     private void startAudioPlayback() {
-        if (!running || !audioEnabled) {
+        if (!running || !settingsManager.audioEnabled) {
             return;
         }
 
@@ -1306,7 +1260,7 @@ public class MainActivity extends Activity {
     }
 
     private void playAudioAtIndex(int index) {
-        if (!running || !audioEnabled) {
+        if (!running || !settingsManager.audioEnabled) {
             return;
         }
 
@@ -1323,7 +1277,7 @@ public class MainActivity extends Activity {
         releaseAudioPlayer();
 
         audioIndex = index;
-        selectedAudioName = audioFiles.get(audioIndex).getName();
+        settingsManager.selectedAudioName = audioFiles.get(audioIndex).getName();
 
         saveSettings();
         updateNowPlayingLabel();
@@ -1345,7 +1299,7 @@ public class MainActivity extends Activity {
                         public void onPrepared(MediaPlayer mp) {
                             if (mediaPlayer != player
                                     || !running
-                                    || !audioEnabled) {
+                                    || !settingsManager.audioEnabled) {
                                 return;
                             }
 
@@ -1384,7 +1338,7 @@ public class MainActivity extends Activity {
                             }
 
                             audioIndex = nextIndex;
-                            selectedAudioName =
+                            settingsManager.selectedAudioName =
                                     audioFiles.get(audioIndex).getName();
 
                             saveSettings();
@@ -1432,7 +1386,7 @@ public class MainActivity extends Activity {
     private void skipToNextTrack() {
         releaseAudioPlayer();
 
-        if (!running || !audioEnabled) {
+        if (!running || !settingsManager.audioEnabled) {
             return;
         }
 
@@ -1448,7 +1402,7 @@ public class MainActivity extends Activity {
             audioIndex = 0;
         }
 
-        selectedAudioName = audioFiles.get(audioIndex).getName();
+        settingsManager.selectedAudioName = audioFiles.get(audioIndex).getName();
 
         saveSettings();
         updateNowPlayingLabel();
@@ -1527,7 +1481,7 @@ public class MainActivity extends Activity {
         handler.postDelayed(clockRunnable, CLOCK_INTERVAL);
         scheduleNextImage();
 
-        if (audioEnabled) {
+        if (settingsManager.audioEnabled) {
             startAudioPlayback();
         }
     }

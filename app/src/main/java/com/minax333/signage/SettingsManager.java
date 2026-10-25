@@ -14,17 +14,20 @@ public final class SettingsManager {
     private static final String KEY_SLIDESHOW_SECONDS = "slideshow_seconds";
     private static final String KEY_AUDIO_ENABLED = "audio_enabled";
     private static final String KEY_SELECTED_AUDIO = "selected_audio_name";
+    private static final String KEY_VIDEO_MODE = "video_mode";
 
     public boolean slideshowEnabled = true;
     public boolean audioEnabled = false;
     public int slideshowSeconds = 10;
     public String selectedAudioName = "";
+    public boolean videoMode = false;
 
     public void load(SharedPreferences preferences) {
         slideshowEnabled = preferences.getBoolean(KEY_SLIDESHOW_ENABLED, true);
         slideshowSeconds = preferences.getInt(KEY_SLIDESHOW_SECONDS, 10);
         audioEnabled = preferences.getBoolean(KEY_AUDIO_ENABLED, false);
         selectedAudioName = preferences.getString(KEY_SELECTED_AUDIO, "");
+        videoMode = preferences.getBoolean(KEY_VIDEO_MODE, false);
 
         if (slideshowSeconds < 1) {
             slideshowSeconds = 1;
@@ -40,6 +43,7 @@ public final class SettingsManager {
                 .putInt(KEY_SLIDESHOW_SECONDS, slideshowSeconds)
                 .putBoolean(KEY_AUDIO_ENABLED, audioEnabled)
                 .putString(KEY_SELECTED_AUDIO, selectedAudioName)
+                .putBoolean(KEY_VIDEO_MODE, videoMode)
                 .apply();
     }
 }

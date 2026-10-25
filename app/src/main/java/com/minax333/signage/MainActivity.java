@@ -765,8 +765,24 @@ public class MainActivity extends Activity {
         if (settingsManager.videoMode) {
             slideshowManager.stopTimer();
             stopAudioPlayback();
+
+            // The standby TextView is layered above the VideoView.
+            // Hide it while video mode is active so it cannot cover the video.
+            statusTextView.setVisibility(View.GONE);
+            clockTextView.setVisibility(View.VISIBLE);
+            dateTextView.setVisibility(View.VISIBLE);
+
             imageView.setVisibility(View.GONE);
             videoView.setVisibility(View.VISIBLE);
+            videoView.bringToFront();
+
+            // Keep controls and overlays above the video surface.
+            statusTextView.bringToFront();
+            dateTextView.bringToFront();
+            clockTextView.bringToFront();
+            settingsButton.bringToFront();
+            musicButton.bringToFront();
+
             videoBackgroundManager.start();
         } else {
             videoBackgroundManager.stop();

@@ -264,8 +264,6 @@ public class MainActivity extends Activity {
                             saveSettings();
                             updateSettingsLabels();
                             applyDisplayMode();
-                            statusTextView.setText("動画が見つからないため画像モードに切り替えました");
-                            statusTextView.setVisibility(View.VISIBLE);
                         }
                     }
                 }
@@ -1102,8 +1100,12 @@ public class MainActivity extends Activity {
         loadSettings();
         updateClock();
 
-        slideshowManager.showFirstImageOrStandby();
         loadAudioFiles();
+        if (settingsManager.videoMode) {
+            applyDisplayMode();
+        } else {
+            slideshowManager.showFirstImageOrStandby();
+        }
 
         updateSettingsLabels();
         updateMusicLibrary();

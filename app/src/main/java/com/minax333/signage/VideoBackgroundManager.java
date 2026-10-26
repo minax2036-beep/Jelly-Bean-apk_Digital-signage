@@ -6,6 +6,7 @@ import android.media.MediaPlayer;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
+import android.net.Uri;
 
 import java.io.File;
 import java.io.IOException;
@@ -37,6 +38,7 @@ public final class VideoBackgroundManager implements TextureView.SurfaceTextureL
     private MediaPlayer mediaPlayer;
     private Surface videoSurface;
     private SurfaceTexture surfaceTexture;
+    private Uri externalUri;
 
     public VideoBackgroundManager(
             Activity activity,
@@ -49,9 +51,31 @@ public final class VideoBackgroundManager implements TextureView.SurfaceTextureL
         textureView.setSurfaceTextureListener(this);
     }
 
+    public void playExternalUri(Uri uri) {
+        if (uri == null) {
+            return;
+        }
+        released = false;
+        playbackRequested = true;
+        externalUri = uri;
+        currentVideoPath = null;
+        releasePlayer();
+        if (textureView.isAvailable()) {
+            surfaceTexture = textureView.getSurfaceTexture();
+            prepareCurrentVideo();
+        }
+    }
+
     public void start() {
         released = false;
         playbackRequested = true;
+        if (externalUri != null) {
+            if (textureView.isAvailable()) {
+                surfaceTexture = textureView.getSurfaceTexture();
+                prepareCurrentVideo();
+            }
+            return;
+        }
         loadVideos();
 
         if (videoFiles.isEmpty()) {
@@ -79,6 +103,7 @@ public final class VideoBackgroundManager implements TextureView.SurfaceTextureL
 
     public void stop() {
         playbackRequested = false;
+        externalUri = null;
         currentVideoPath = null;
         releasePlayer();
     }
@@ -142,9 +167,10 @@ public final class VideoBackgroundManager implements TextureView.SurfaceTextureL
             videoIndex = 0;
         }
 
-        final File file = videoFiles.get(videoIndex);
+        final File file = externalUri == null ? videoFiles.get(videoIndex) : null;
+        final Uri uri = externalUri;
         releasePlayer();
-        currentVideoPath = file.getAbsolutePath();
+        currentVideoPath = uri == null ? file.getAbsolutePath() : uri.toString();
 
         try {
             videoSurface = new Surface(surfaceTexture);
@@ -153,7 +179,11 @@ public final class VideoBackgroundManager implements TextureView.SurfaceTextureL
             preparing = true;
 
             player.setSurface(videoSurface);
-            player.setDataSource(file.getAbsolutePath());
+            if (uri != null) {
+                player.setDataSource(activity, uri);
+            } else {
+                player.setDataSource(file.getAbsolutePath());
+            }
             player.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                 @Override
                 public void onPrepared(MediaPlayer mp) {
@@ -175,7 +205,20 @@ public final class VideoBackgroundManager implements TextureView.SurfaceTextureL
                 @Override
                 public void onCompletion(MediaPlayer mp) {
                     if (mediaPlayer == player) {
-                        playNextVideo();
+                        if (externalUri != null) {
+                            externalUri = null;
+                            currentVideoPath = null;
+                            releasePlayer();
+                            loadVideos();
+                            if (videoFiles.isEmpty()) {
+                                playbackRequested = false;
+                                listener.onNoVideosFound();
+                            } else {
+                                prepareCurrentVideo();
+                            }
+                        } else {
+                            playNextVideo();
+                        }
                     }
                 }
             });

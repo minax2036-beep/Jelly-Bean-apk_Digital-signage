@@ -34,8 +34,8 @@ public final class SettingsPanel {
         panel = new LinearLayout(activity);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setGravity(Gravity.CENTER_HORIZONTAL);
-        panel.setPadding(24, 24, 24, 24);
-        panel.setBackgroundColor(Color.rgb(30, 30, 30));
+        panel.setPadding(20, 18, 20, 18);
+        panel.setBackgroundColor(Color.rgb(17, 24, 39));
         panel.setVisibility(View.GONE);
 
         ScrollView scrollView = new ScrollView(activity);
@@ -46,7 +46,8 @@ public final class SettingsPanel {
         TextView title = new TextView(activity);
         title.setText("Signage 設定");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(26);
+        title.setTextSize(25);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         title.setPadding(0, 8, 0, 24);
         content.addView(title, matchWrapParams());
@@ -72,6 +73,7 @@ public final class SettingsPanel {
                 listener.onToggleDisplayMode();
             }
         });
+        UiStyle.styleButton(displayModeButton);
         content.addView(displayModeButton, buttonParams());
 
         TextView slideshowTitle = new TextView(activity);
@@ -94,6 +96,7 @@ public final class SettingsPanel {
                 listener.onToggleSlideshow();
             }
         });
+        UiStyle.styleButton(toggleButton);
         content.addView(toggleButton, buttonParams());
 
         intervalStatusText = new TextView(activity);
@@ -110,6 +113,7 @@ public final class SettingsPanel {
                 listener.onChangeInterval();
             }
         });
+        UiStyle.styleButton(intervalButton);
         content.addView(intervalButton, buttonParams());
 
         TextView audioTitle = new TextView(activity);
@@ -132,6 +136,7 @@ public final class SettingsPanel {
                 listener.onToggleAudio();
             }
         });
+        UiStyle.styleButton(audioToggleButton);
         content.addView(audioToggleButton, buttonParams());
 
         TextView playbackInfo = new TextView(activity);
@@ -163,6 +168,7 @@ public final class SettingsPanel {
                 listener.onClose();
             }
         });
+        UiStyle.styleSecondaryButton(closeButton);
         content.addView(closeButton, buttonParams());
 
         scrollView.addView(content);
@@ -176,7 +182,7 @@ public final class SettingsPanel {
 
     private LinearLayout.LayoutParams buttonParams() {
         LinearLayout.LayoutParams params = matchWrapParams();
-        params.setMargins(0, 6, 0, 6);
+        params.setMargins(0, 8, 0, 8);
         return params;
     }
 

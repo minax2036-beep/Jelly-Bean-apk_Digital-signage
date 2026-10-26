@@ -66,6 +66,8 @@ public class MainActivity extends Activity {
     private SettingsPanel settingsPanel;
     private MusicPanel musicPanel;
     private Home homePanel;
+    private CreativeDisplayView creativeDisplayView;
+    private boolean creativeDisplayVisible = false;
 
     private final Handler handler = new Handler();
 
@@ -609,8 +611,56 @@ public class MainActivity extends Activity {
         createMusicPanel();
         createSettingsPanel();
         createHomePanel();
+        createCreativeDisplay();
 
         setContentView(rootLayout);
+        showHome();
+    }
+
+    private void createCreativeDisplay() {
+        creativeDisplayView = new CreativeDisplayView(this);
+        creativeDisplayView.setVisibility(View.GONE);
+        rootLayout.addView(creativeDisplayView, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private void showCreativeDisplay(int mode) {
+        homeVisible = false;
+        settingsVisible = false;
+        musicVisible = false;
+        creativeDisplayVisible = true;
+        manualAudioPlayback = false;
+        stopAudioPlayback();
+        slideshowManager.stopTimer();
+        videoBackgroundManager.stop();
+        handler.removeCallbacks(updateVideoControlsRunnable);
+        handler.removeCallbacks(hideVideoControlsRunnable);
+
+        if (homePanel != null) homePanel.getView().setVisibility(View.GONE);
+        if (settingsPanel != null) settingsPanel.getView().setVisibility(View.GONE);
+        if (musicPanel != null) musicPanel.getView().setVisibility(View.GONE);
+        if (videoControlsPanel != null) videoControlsPanel.getView().setVisibility(View.GONE);
+        imageView.setVisibility(View.GONE);
+        videoView.setVisibility(View.GONE);
+        statusTextView.setVisibility(View.GONE);
+        clockTextView.setVisibility(View.GONE);
+        dateTextView.setVisibility(View.GONE);
+        settingsButton.setVisibility(View.GONE);
+        musicButton.setVisibility(View.GONE);
+        homeButton.setVisibility(View.VISIBLE);
+
+        creativeDisplayView.setMode(mode);
+        creativeDisplayView.setVisibility(View.VISIBLE);
+        creativeDisplayView.bringToFront();
+        homeButton.bringToFront();
+    }
+
+    private void leaveCreativeDisplay() {
+        creativeDisplayVisible = false;
+        if (creativeDisplayView != null) {
+            creativeDisplayView.setVisibility(View.GONE);
+        }
         showHome();
     }
 
@@ -673,6 +723,16 @@ public class MainActivity extends Activity {
                 hideHome();
                 showSettings();
             }
+
+            @Override
+            public void onVisualizerSelected() {
+                showCreativeDisplay(CreativeDisplayView.MODE_VISUALIZER);
+            }
+
+            @Override
+            public void onFullscreenClockSelected() {
+                showCreativeDisplay(CreativeDisplayView.MODE_CLOCK);
+            }
         });
         rootLayout.addView(
                 homePanel.getView(),
@@ -685,6 +745,8 @@ public class MainActivity extends Activity {
     }
 
     private void showHome() {
+        creativeDisplayVisible = false;
+        if (creativeDisplayView != null) creativeDisplayView.setVisibility(View.GONE);
         homeVisible = true;
         settingsVisible = false;
         musicVisible = false;
@@ -1559,7 +1621,9 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (settingsVisible) {
+        if (creativeDisplayVisible) {
+            leaveCreativeDisplay();
+        } else if (settingsVisible) {
             hideSettings();
         } else if (musicVisible) {
             hideMusicLibrary();

@@ -152,6 +152,7 @@ public final class VideoBackgroundManager implements TextureView.SurfaceTextureL
 
     public void playNextManually() {
         if (externalUri != null) {
+            releasePlayer();
             externalUri = null;
             currentVideoPath = null;
             loadVideos();
@@ -171,6 +172,7 @@ public final class VideoBackgroundManager implements TextureView.SurfaceTextureL
 
     public void playPreviousManually() {
         if (externalUri != null) {
+            releasePlayer();
             externalUri = null;
             currentVideoPath = null;
             loadVideos();

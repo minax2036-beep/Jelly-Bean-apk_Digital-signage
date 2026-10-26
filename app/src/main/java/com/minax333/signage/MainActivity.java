@@ -1026,7 +1026,7 @@ public class MainActivity extends Activity {
         if (settingsPanel.displayModeStatusText != null) {
             settingsPanel.displayModeStatusText.setText(
                     "現在：" + (settingsManager.videoMode ? "動画プレイヤー" : "画像スライドショー")
-                            + "\\n初期設定：画像スライドショー"
+                            + "\n初期設定：画像スライドショー"
             );
         }
 
@@ -1120,8 +1120,8 @@ public class MainActivity extends Activity {
             // The standby TextView is layered above the VideoView.
             // Hide it while video mode is active so it cannot cover the video.
             statusTextView.setVisibility(View.GONE);
-            clockTextView.setVisibility(View.VISIBLE);
-            dateTextView.setVisibility(View.VISIBLE);
+            clockTextView.setVisibility(View.GONE);
+            dateTextView.setVisibility(View.GONE);
 
             imageView.setVisibility(View.GONE);
             videoView.setVisibility(View.VISIBLE);

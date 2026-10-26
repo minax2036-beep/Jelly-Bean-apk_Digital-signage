@@ -950,23 +950,6 @@ public class MainActivity extends Activity {
                 this,
                 new SettingsPanel.Listener() {
                     @Override
-                    public void onToggleSlideshow() {
-                        settingsManager.slideshowEnabled =
-                                !settingsManager.slideshowEnabled;
-                        saveSettings();
-                        updateSettingsLabels();
-                        restartImageTimer();
-                    }
-
-                    @Override
-                    public void onToggleDisplayMode() {
-                        settingsManager.videoMode = !settingsManager.videoMode;
-                        saveSettings();
-                        updateSettingsLabels();
-                        applyDisplayMode();
-                    }
-
-                    @Override
                     public void onChangeInterval() {
                         showIntervalDialog();
                     }
@@ -1023,19 +1006,6 @@ public class MainActivity extends Activity {
     }
 
     private void updateSettingsLabels() {
-        if (settingsPanel.displayModeStatusText != null) {
-            settingsPanel.displayModeStatusText.setText(
-                    "現在：" + (settingsManager.videoMode ? "動画プレイヤー" : "画像スライドショー")
-                            + "\n初期設定：画像スライドショー"
-            );
-        }
-
-        if (settingsPanel.slideshowStatusText != null) {
-            settingsPanel.slideshowStatusText.setText(
-                    "状態：" + (settingsManager.slideshowEnabled ? "オン" : "オフ")
-            );
-        }
-
         if (settingsPanel.intervalStatusText != null) {
             settingsPanel.intervalStatusText.setText(
                     "切り替え間隔：" + settingsManager.slideshowSeconds + " 秒"

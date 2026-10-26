@@ -194,8 +194,8 @@ public class MainActivity extends Activity {
             settingsManager.videoMode = true;
             saveSettings();
             updateSettingsLabels();
-            applyDisplayMode();
             videoBackgroundManager.playExternalUri(uri);
+            applyDisplayMode();
         } else if (type.startsWith("audio/")) {
             settingsManager.videoMode = false;
             saveSettings();
@@ -203,6 +203,8 @@ public class MainActivity extends Activity {
             videoView.setVisibility(View.GONE);
             imageView.setVisibility(View.VISIBLE);
             slideshowManager.stopTimer();
+            slideshowManager.showCurrentImageOrStandby();
+            updateClock();
             stopAudioPlayback();
             playExternalAudio(uri);
         } else if (type.startsWith("image/")) {

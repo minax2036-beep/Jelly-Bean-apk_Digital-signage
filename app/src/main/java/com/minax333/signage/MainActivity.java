@@ -94,6 +94,7 @@ public class MainActivity extends Activity {
 
 
     private boolean audioPreparing = false;
+    private boolean manualAudioPlayback = false;
     private SlideshowManager slideshowManager;
 
 
@@ -695,6 +696,7 @@ public class MainActivity extends Activity {
         if (slideshowManager != null) {
             slideshowManager.stopTimer();
         }
+        manualAudioPlayback = false;
         stopAudioPlayback();
 
         if (homePanel != null) {
@@ -711,6 +713,9 @@ public class MainActivity extends Activity {
             musicButton.setVisibility(View.GONE);
         }
         updateClock();
+        if (running && settingsManager.audioEnabled) {
+            startAudioPlayback();
+        }
     }
 
     private void hideHome() {
@@ -766,6 +771,8 @@ public class MainActivity extends Activity {
         }
 
         musicVisible = true;
+        manualAudioPlayback = false;
+        stopAudioPlayback();
 
         slideshowManager.stopTimer();
 
@@ -910,7 +917,8 @@ public class MainActivity extends Activity {
          * If music is already enabled, immediately start the
          * selected song. Otherwise, it will play when enabled.
          */
-        if (settingsManager.audioEnabled && running) {
+        if (running) {
+            manualAudioPlayback = true;
             playAudioAtIndex(audioIndex);
         }
     }
@@ -971,8 +979,10 @@ public class MainActivity extends Activity {
                         updateSettingsLabels();
 
                         if (settingsManager.audioEnabled) {
-                            startAudioPlayback();
-                        } else {
+                            if (!settingsManager.videoMode && !musicVisible) {
+                                startAudioPlayback();
+                            }
+                        } else if (!manualAudioPlayback) {
                             stopAudioPlayback();
                         }
                     }
@@ -1102,7 +1112,10 @@ public class MainActivity extends Activity {
 
         if (settingsManager.videoMode) {
             slideshowManager.stopTimer();
+            manualAudioPlayback = false;
             stopAudioPlayback();
+            settingsButton.setVisibility(View.GONE);
+            musicButton.setVisibility(View.GONE);
 
             // The standby TextView is layered above the VideoView.
             // Hide it while video mode is active so it cannot cover the video.
@@ -1127,6 +1140,10 @@ public class MainActivity extends Activity {
             handler.post(updateVideoControlsRunnable);
         } else {
             videoBackgroundManager.stop();
+            if (!homeVisible) {
+                settingsButton.setVisibility(View.VISIBLE);
+                musicButton.setVisibility(View.VISIBLE);
+            }
             handler.removeCallbacks(updateVideoControlsRunnable);
             handler.removeCallbacks(hideVideoControlsRunnable);
             if (videoControlsPanel != null) videoControlsPanel.getView().setVisibility(View.GONE);
@@ -1137,7 +1154,7 @@ public class MainActivity extends Activity {
             slideshowManager.showCurrentImageOrStandby();
             slideshowManager.scheduleNextImage();
 
-            if (running && settingsManager.audioEnabled) {
+            if (running && settingsManager.audioEnabled && !musicVisible) {
                 startAudioPlayback();
             }
         }
@@ -1268,8 +1285,19 @@ public class MainActivity extends Activity {
      * Tracks play in filename order. After the last track,
      * playback returns to the first track.
      */
+    private boolean shouldPlayBackgroundMusic() {
+        return running
+                && settingsManager.audioEnabled
+                && !settingsManager.videoMode
+                && !musicVisible;
+    }
+
+    private boolean shouldPlayAudio() {
+        return manualAudioPlayback || shouldPlayBackgroundMusic();
+    }
+
     private void startAudioPlayback() {
-        if (!running || !settingsManager.audioEnabled) {
+        if (!shouldPlayAudio()) {
             return;
         }
 
@@ -1293,7 +1321,7 @@ public class MainActivity extends Activity {
     }
 
     private void playAudioAtIndex(int index) {
-        if (!running || !settingsManager.audioEnabled) {
+        if (!shouldPlayAudio()) {
             return;
         }
 
@@ -1332,7 +1360,7 @@ public class MainActivity extends Activity {
                         public void onPrepared(MediaPlayer mp) {
                             if (mediaPlayer != player
                                     || !running
-                                    || !settingsManager.audioEnabled) {
+                                    || !shouldPlayAudio()) {
                                 return;
                             }
 
@@ -1419,7 +1447,7 @@ public class MainActivity extends Activity {
     private void skipToNextTrack() {
         releaseAudioPlayer();
 
-        if (!running || !settingsManager.audioEnabled) {
+        if (!shouldPlayAudio()) {
             return;
         }
 
@@ -1517,7 +1545,7 @@ public class MainActivity extends Activity {
 
         handler.postDelayed(clockRunnable, CLOCK_INTERVAL);
 
-        if (!homeVisible && !settingsManager.videoMode && settingsManager.audioEnabled) {
+        if (shouldPlayBackgroundMusic()) {
             startAudioPlayback();
         }
 

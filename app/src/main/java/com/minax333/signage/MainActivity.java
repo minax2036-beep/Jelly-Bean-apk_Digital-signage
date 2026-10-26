@@ -1288,7 +1288,7 @@ public class MainActivity extends Activity {
     private boolean shouldPlayBackgroundMusic() {
         return running
                 && settingsManager.audioEnabled
-                && !settingsManager.videoMode
+                && (homeVisible || !settingsManager.videoMode)
                 && !musicVisible;
     }
 

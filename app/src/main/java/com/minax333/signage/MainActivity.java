@@ -45,9 +45,11 @@ public class MainActivity extends Activity {
 
     private Button settingsButton;
     private Button musicButton;
+    private Button homeButton;
 
     private SettingsPanel settingsPanel;
     private MusicPanel musicPanel;
+    private Home homePanel;
 
     private final Handler handler = new Handler();
 
@@ -71,6 +73,7 @@ public class MainActivity extends Activity {
     private boolean running = false;
     private boolean settingsVisible = false;
     private boolean musicVisible = false;
+    private boolean homeVisible = true;
     private Intent pendingMediaIntent;
 
 
@@ -130,7 +133,7 @@ public class MainActivity extends Activity {
         loadAudioFiles();
         // Video playback starts in onResume(), after the Activity is active.
         // Starting VideoView here as well can create overlapping playback sessions.
-        if (!settingsManager.videoMode) {
+        if (!homeVisible && !settingsManager.videoMode) {
             slideshowManager.showFirstImageOrStandby();
         }
 
@@ -189,6 +192,12 @@ public class MainActivity extends Activity {
             showOpenMediaError("このファイル形式には対応していません。");
             return;
         }
+
+        homeVisible = false;
+        homePanel.getView().setVisibility(View.GONE);
+        homeButton.setVisibility(View.VISIBLE);
+        settingsButton.setVisibility(View.VISIBLE);
+        musicButton.setVisibility(View.VISIBLE);
 
         if (type.startsWith("video/")) {
             settingsManager.videoMode = true;
@@ -486,6 +495,25 @@ public class MainActivity extends Activity {
                 musicButtonParams
         );
 
+        homeButton = new Button(this);
+        homeButton.setText("ホーム");
+        UiStyle.styleSecondaryButton(homeButton);
+        homeButton.setVisibility(View.GONE);
+        homeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                showHome();
+            }
+        });
+        FrameLayout.LayoutParams homeButtonParams =
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Gravity.TOP | Gravity.LEFT
+                );
+        homeButtonParams.setMargins(12, 12, 0, 0);
+        rootLayout.addView(homeButton, homeButtonParams);
+
         /*
          * Swipe navigation.
          * The listener returns false so ordinary touch handling
@@ -506,8 +534,10 @@ public class MainActivity extends Activity {
 
         createMusicPanel();
         createSettingsPanel();
+        createHomePanel();
 
         setContentView(rootLayout);
+        showHome();
     }
 
     private void handleSwipe(MotionEvent event) {
@@ -537,6 +567,100 @@ public class MainActivity extends Activity {
             } else if (musicVisible && deltaX > 0) {
                 hideMusicLibrary();
             }
+        }
+    }
+
+    private void createHomePanel() {
+        homePanel = new Home(this, new Home.Listener() {
+            @Override
+            public void onVideoSelected() {
+                settingsManager.videoMode = true;
+                saveSettings();
+                hideHome();
+                applyDisplayMode();
+            }
+
+            @Override
+            public void onMusicSelected() {
+                hideHome();
+                showMusicLibrary();
+            }
+
+            @Override
+            public void onImagesSelected() {
+                settingsManager.videoMode = false;
+                saveSettings();
+                hideHome();
+                applyDisplayMode();
+            }
+
+            @Override
+            public void onSettingsSelected() {
+                hideHome();
+                showSettings();
+            }
+        });
+        rootLayout.addView(
+                homePanel.getView(),
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        Gravity.CENTER
+                )
+        );
+    }
+
+    private void showHome() {
+        homeVisible = true;
+        settingsVisible = false;
+        musicVisible = false;
+
+        if (settingsPanel != null) {
+            settingsPanel.getView().setVisibility(View.GONE);
+        }
+        if (musicPanel != null) {
+            musicPanel.getView().setVisibility(View.GONE);
+        }
+        if (videoBackgroundManager != null) {
+            videoBackgroundManager.stop();
+        }
+        if (slideshowManager != null) {
+            slideshowManager.stopTimer();
+        }
+        stopAudioPlayback();
+
+        if (homePanel != null) {
+            homePanel.getView().setVisibility(View.VISIBLE);
+            homePanel.getView().bringToFront();
+        }
+        if (homeButton != null) {
+            homeButton.setVisibility(View.GONE);
+        }
+        if (settingsButton != null) {
+            settingsButton.setVisibility(View.GONE);
+        }
+        if (musicButton != null) {
+            musicButton.setVisibility(View.GONE);
+        }
+        updateClock();
+    }
+
+    private void hideHome() {
+        homeVisible = false;
+        if (homePanel != null) {
+            homePanel.getView().setVisibility(View.GONE);
+        }
+        if (homeButton != null) {
+            homeButton.setVisibility(View.VISIBLE);
+            homeButton.bringToFront();
+        }
+        if (settingsButton != null) {
+            settingsButton.setVisibility(View.VISIBLE);
+            settingsButton.bringToFront();
+        }
+        if (musicButton != null) {
+            musicButton.setVisibility(View.VISIBLE);
+            musicButton.bringToFront();
         }
     }
 
@@ -587,12 +711,7 @@ public class MainActivity extends Activity {
     private void hideMusicLibrary() {
         musicVisible = false;
         musicPanel.getView().setVisibility(View.GONE);
-
-        settingsButton.bringToFront();
-        musicButton.bringToFront();
-
-        updateClock();
-        applyDisplayMode();
+        showHome();
     }
 
     private void updateMusicLibrary() {
@@ -822,12 +941,7 @@ public class MainActivity extends Activity {
     private void hideSettings() {
         settingsVisible = false;
         settingsPanel.getView().setVisibility(View.GONE);
-
-        settingsButton.bringToFront();
-        musicButton.bringToFront();
-
-        updateClock();
-        applyDisplayMode();
+        showHome();
     }
 
     private void updateSettingsLabels() {
@@ -955,9 +1069,14 @@ public class MainActivity extends Activity {
 
     private void updateClock() {
         Date now = new Date();
+        String time = timeFormat.format(now);
+        String date = dateFormat.format(now);
 
-        clockTextView.setText(timeFormat.format(now));
-        dateTextView.setText(dateFormat.format(now));
+        clockTextView.setText(time);
+        dateTextView.setText(date);
+        if (homePanel != null) {
+            homePanel.updateClock(time, date);
+        }
     }
 
     /*
@@ -1255,6 +1374,8 @@ public class MainActivity extends Activity {
             hideSettings();
         } else if (musicVisible) {
             hideMusicLibrary();
+        } else if (!homeVisible) {
+            showHome();
         } else {
             super.onBackPressed();
         }
@@ -1274,11 +1395,13 @@ public class MainActivity extends Activity {
 
         loadAudioFiles();
 
-        if (settingsManager.videoMode) {
-            applyDisplayMode();
-        } else {
-            slideshowManager.showFirstImageOrStandby();
-            slideshowManager.scheduleNextImage();
+        if (!homeVisible) {
+            if (settingsManager.videoMode) {
+                applyDisplayMode();
+            } else {
+                slideshowManager.showFirstImageOrStandby();
+                slideshowManager.scheduleNextImage();
+            }
         }
 
         updateSettingsLabels();
@@ -1286,7 +1409,7 @@ public class MainActivity extends Activity {
 
         handler.postDelayed(clockRunnable, CLOCK_INTERVAL);
 
-        if (!settingsManager.videoMode && settingsManager.audioEnabled) {
+        if (!homeVisible && !settingsManager.videoMode && settingsManager.audioEnabled) {
             startAudioPlayback();
         }
 

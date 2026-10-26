@@ -155,7 +155,7 @@ public final class Home {
     public void updateClock(String time, String date) {
         clockText.setText(time);
         dateText.setText(date);
-        String todayKey = new SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(new Date());
+        String todayKey = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
         if (!todayKey.equals(calendarKey)) {
             refreshCalendar();
         } else {
@@ -165,7 +165,7 @@ public final class Home {
 
     private void refreshCalendar() {
         Calendar now = Calendar.getInstance();
-        calendarKey = new SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(now.getTime());
+        calendarKey = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(now.getTime());
         monthTitle.setText(new SimpleDateFormat("yyyy年 M月", Locale.JAPAN).format(now.getTime()));
         calendarGrid.removeAllViews();
 

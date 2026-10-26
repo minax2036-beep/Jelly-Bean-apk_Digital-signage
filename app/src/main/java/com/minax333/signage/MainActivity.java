@@ -19,7 +19,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.VideoView;
+import android.view.TextureView;
 import android.media.MediaPlayer;
 
 import java.io.File;
@@ -35,7 +35,7 @@ public class MainActivity extends Activity {
 
     private FrameLayout rootLayout;
     private ImageView imageView;
-    private VideoView videoView;
+    private TextureView videoView;
     private VideoBackgroundManager videoBackgroundManager;
     private TextView clockTextView;
     private TextView dateTextView;
@@ -160,7 +160,7 @@ public class MainActivity extends Activity {
                 )
         );
 
-        videoView = new VideoView(this);
+        videoView = new TextureView(this);
         videoView.setBackgroundColor(Color.BLACK);
         videoView.setVisibility(View.GONE);
         rootLayout.addView(

@@ -117,7 +117,7 @@ public final class SettingsPanel {
         content.addView(intervalButton, buttonParams());
 
         TextView audioTitle = new TextView(activity);
-        audioTitle.setText("\n音楽再生");
+        audioTitle.setText("\nバックグラウンド音楽");
         audioTitle.setTextColor(Color.WHITE);
         audioTitle.setTextSize(20);
         content.addView(audioTitle);
@@ -129,7 +129,7 @@ public final class SettingsPanel {
         content.addView(audioStatusText);
 
         Button audioToggleButton = new Button(activity);
-        audioToggleButton.setText("音楽 オン／オフ");
+        audioToggleButton.setText("BGM オン／オフ");
         audioToggleButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -140,11 +140,10 @@ public final class SettingsPanel {
         content.addView(audioToggleButton, buttonParams());
 
         TextView playbackInfo = new TextView(activity);
-        playbackInfo.setText("\n再生方法\n"
-                + "・曲一覧のファイル名順\n"
-                + "・最後の曲の次は先頭へ戻る\n"
-                + "・音楽一覧から曲を選択\n"
-                + "・選択曲は設定に保存");
+        playbackInfo.setText("\nBGMの動作\n"
+                + "・ホームや画像／時計画面で再生\n"
+                + "・動画再生中は自動停止\n"
+                + "・音楽ライブラリの曲再生とは別設定");
         playbackInfo.setTextColor(Color.LTGRAY);
         playbackInfo.setTextSize(16);
         playbackInfo.setPadding(0, 12, 0, 16);

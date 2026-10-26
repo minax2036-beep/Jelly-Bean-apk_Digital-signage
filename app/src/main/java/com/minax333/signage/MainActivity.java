@@ -3,6 +3,8 @@ package com.minax333.signage;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
@@ -69,6 +71,7 @@ public class MainActivity extends Activity {
     private boolean running = false;
     private boolean settingsVisible = false;
     private boolean musicVisible = false;
+    private Intent pendingMediaIntent;
 
 
     private boolean audioPreparing = false;
@@ -113,6 +116,8 @@ public class MainActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         );
 
+        pendingMediaIntent = getIntent();
+
         preferences = getSharedPreferences(
                 SettingsManager.PREFS_NAME,
                 MODE_PRIVATE
@@ -131,6 +136,158 @@ public class MainActivity extends Activity {
 
         updateSettingsLabels();
         updateMusicLibrary();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        pendingMediaIntent = intent;
+        if (running) {
+            handleIncomingMediaIntent();
+        }
+    }
+
+    private void handleIncomingMediaIntent() {
+        Intent intent = pendingMediaIntent;
+        pendingMediaIntent = null;
+
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction())) {
+            return;
+        }
+
+        final Uri uri = intent.getData();
+        if (uri == null) {
+            return;
+        }
+
+        String type = intent.getType();
+        if (type == null) {
+            type = getContentResolver().getType(uri);
+        }
+        if (type == null) {
+            String path = uri.getLastPathSegment();
+            if (path != null) {
+                String lower = path.toLowerCase(Locale.US);
+                if (lower.endsWith(".mp4") || lower.endsWith(".3gp")
+                        || lower.endsWith(".m4v") || lower.endsWith(".webm")
+                        || lower.endsWith(".mkv") || lower.endsWith(".avi")) {
+                    type = "video/*";
+                } else if (lower.endsWith(".mp3") || lower.endsWith(".m4a")
+                        || lower.endsWith(".aac") || lower.endsWith(".ogg")
+                        || lower.endsWith(".wav")) {
+                    type = "audio/*";
+                } else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+                        || lower.endsWith(".png") || lower.endsWith(".webp")
+                        || lower.endsWith(".bmp") || lower.endsWith(".gif")) {
+                    type = "image/*";
+                }
+            }
+        }
+
+        if (type == null) {
+            showOpenMediaError("このファイル形式には対応していません。");
+            return;
+        }
+
+        if (type.startsWith("video/")) {
+            settingsManager.videoMode = true;
+            saveSettings();
+            updateSettingsLabels();
+            applyDisplayMode();
+            videoBackgroundManager.playExternalUri(uri);
+        } else if (type.startsWith("audio/")) {
+            settingsManager.videoMode = false;
+            saveSettings();
+            videoBackgroundManager.stop();
+            videoView.setVisibility(View.GONE);
+            imageView.setVisibility(View.VISIBLE);
+            slideshowManager.stopTimer();
+            stopAudioPlayback();
+            playExternalAudio(uri);
+        } else if (type.startsWith("image/")) {
+            settingsManager.videoMode = false;
+            saveSettings();
+            videoBackgroundManager.stop();
+            stopAudioPlayback();
+            slideshowManager.stopTimer();
+            videoView.setVisibility(View.GONE);
+            imageView.setVisibility(View.VISIBLE);
+            imageView.setImageURI(uri);
+            statusTextView.setVisibility(View.GONE);
+            clockTextView.setVisibility(View.VISIBLE);
+            dateTextView.setVisibility(View.VISIBLE);
+            statusTextView.bringToFront();
+            dateTextView.bringToFront();
+            clockTextView.bringToFront();
+            settingsButton.bringToFront();
+            musicButton.bringToFront();
+        } else {
+            showOpenMediaError("このファイル形式には対応していません。");
+        }
+    }
+
+    private void showOpenMediaError(String message) {
+        new AlertDialog.Builder(this)
+                .setTitle("ファイルを開けません")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    private void playExternalAudio(final Uri uri) {
+        releaseAudioPlayer();
+
+        final MediaPlayer player = new MediaPlayer();
+        mediaPlayer = player;
+        audioPreparing = true;
+
+        try {
+            player.setDataSource(this, uri);
+            player.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                @Override
+                public void onPrepared(MediaPlayer mp) {
+                    if (mediaPlayer != player || !running) {
+                        return;
+                    }
+                    audioPreparing = false;
+                    try {
+                        player.start();
+                    } catch (IllegalStateException exception) {
+                        releaseAudioPlayer();
+                        showOpenMediaError("音声ファイルを再生できませんでした。");
+                    }
+                }
+            });
+            player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                @Override
+                public void onCompletion(MediaPlayer mp) {
+                    if (mediaPlayer == player) {
+                        releaseAudioPlayer();
+                    }
+                }
+            });
+            player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+                @Override
+                public boolean onError(MediaPlayer mp, int what, int extra) {
+                    if (mediaPlayer == player) {
+                        releaseAudioPlayer();
+                        showOpenMediaError("音声ファイルを再生できませんでした。");
+                    }
+                    return true;
+                }
+            });
+            player.prepareAsync();
+        } catch (IOException exception) {
+            releaseAudioPlayer();
+            showOpenMediaError("音声ファイルを開けませんでした。");
+        } catch (IllegalArgumentException exception) {
+            releaseAudioPlayer();
+            showOpenMediaError("この音声形式には対応していません。");
+        } catch (IllegalStateException exception) {
+            releaseAudioPlayer();
+            showOpenMediaError("音声ファイルを再生できませんでした。");
+        }
     }
 
     private void loadSettings() {
@@ -1132,6 +1289,10 @@ public class MainActivity extends Activity {
 
         if (!settingsManager.videoMode && settingsManager.audioEnabled) {
             startAudioPlayback();
+        }
+
+        if (pendingMediaIntent != null) {
+            handleIncomingMediaIntent();
         }
     }
 

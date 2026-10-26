@@ -335,6 +335,30 @@ public final class VideoBackgroundManager implements TextureView.SurfaceTextureL
     }
 
     private void handlePlaybackFailure() {
+        if (externalUri != null) {
+            // Do not retry a failed external URI once for every local file.
+            // Fall back to the local signage playlist when possible.
+            externalUri = null;
+            currentVideoPath = null;
+            releasePlayer();
+
+            if (!playbackRequested || released) {
+                return;
+            }
+
+            loadVideos();
+            failedAttempts = 0;
+
+            if (videoFiles.isEmpty()) {
+                playbackRequested = false;
+                listener.onNoVideosFound();
+            } else {
+                videoIndex = 0;
+                prepareCurrentVideo();
+            }
+            return;
+        }
+
         failedAttempts++;
         releasePlayer();
 

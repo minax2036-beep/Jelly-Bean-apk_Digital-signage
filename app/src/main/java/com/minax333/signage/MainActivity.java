@@ -242,8 +242,8 @@ public class MainActivity extends Activity {
             imageView.setVisibility(View.VISIBLE);
             imageView.setImageURI(uri);
             statusTextView.setVisibility(View.GONE);
-            clockTextView.setVisibility(View.VISIBLE);
-            dateTextView.setVisibility(View.VISIBLE);
+            clockTextView.setVisibility(View.GONE);
+            dateTextView.setVisibility(View.GONE);
             statusTextView.bringToFront();
             dateTextView.bringToFront();
             clockTextView.bringToFront();
@@ -1131,6 +1131,8 @@ public class MainActivity extends Activity {
             handler.removeCallbacks(hideVideoControlsRunnable);
             if (videoControlsPanel != null) videoControlsPanel.getView().setVisibility(View.GONE);
             videoView.setVisibility(View.GONE);
+            clockTextView.setVisibility(View.VISIBLE);
+            dateTextView.setVisibility(View.VISIBLE);
             imageView.setVisibility(View.VISIBLE);
             slideshowManager.showCurrentImageOrStandby();
             slideshowManager.scheduleNextImage();

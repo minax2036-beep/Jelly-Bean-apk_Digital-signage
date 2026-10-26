@@ -26,6 +26,8 @@ public final class Home {
         void onMusicSelected();
         void onImagesSelected();
         void onSettingsSelected();
+        void onVisualizerSelected();
+        void onFullscreenClockSelected();
     }
 
     private final Activity activity;
@@ -91,6 +93,8 @@ public final class Home {
         tileRow1.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout tileRow2 = new LinearLayout(activity);
         tileRow2.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout tileRow3 = new LinearLayout(activity);
+        tileRow3.setOrientation(LinearLayout.HORIZONTAL);
 
         tileRow1.addView(createTile("▶", "動画", "動画を再生", Color.rgb(25, 116, 232), new View.OnClickListener() {
             @Override public void onClick(View view) { listener.onVideoSelected(); }
@@ -104,10 +108,19 @@ public final class Home {
         tileRow2.addView(createTile("⚙", "設定", "表示や再生を設定", Color.rgb(204, 113, 16), new View.OnClickListener() {
             @Override public void onClick(View view) { listener.onSettingsSelected(); }
         }), tileParams());
+        tileRow3.addView(createTile("✧", "ビジュアライザー", "動く光と粒子", Color.rgb(91, 62, 190), new View.OnClickListener() {
+            @Override public void onClick(View view) { listener.onVisualizerSelected(); }
+        }), tileParams());
+        tileRow3.addView(createTile("◷", "大画面時計", "時計を全画面表示", Color.rgb(0, 137, 180), new View.OnClickListener() {
+            @Override public void onClick(View view) { listener.onFullscreenClockSelected(); }
+        }), tileParams());
         tiles.addView(tileRow1, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         LinearLayout.LayoutParams row2Params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1);
-        row2Params.topMargin = dp(8);
+        row2Params.topMargin = dp(5);
         tiles.addView(tileRow2, row2Params);
+        LinearLayout.LayoutParams row3Params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1);
+        row3Params.topMargin = dp(5);
+        tiles.addView(tileRow3, row3Params);
         mainContent.addView(tiles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 3));
 
         LinearLayout calendarPanel = new LinearLayout(activity);

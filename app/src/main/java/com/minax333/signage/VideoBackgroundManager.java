@@ -101,6 +101,94 @@ public final class VideoBackgroundManager implements TextureView.SurfaceTextureL
         }
     }
 
+    public void togglePlayback() {
+        if (mediaPlayer == null || preparing) return;
+        try {
+            if (mediaPlayer.isPlaying()) mediaPlayer.pause();
+            else mediaPlayer.start();
+        } catch (IllegalStateException ignored) {
+        }
+    }
+
+    public boolean isPlaying() {
+        try {
+            return mediaPlayer != null && mediaPlayer.isPlaying();
+        } catch (IllegalStateException ignored) {
+            return false;
+        }
+    }
+
+    public int getDuration() {
+        try {
+            return mediaPlayer != null && !preparing ? mediaPlayer.getDuration() : 0;
+        } catch (IllegalStateException ignored) {
+            return 0;
+        }
+    }
+
+    public int getCurrentPosition() {
+        try {
+            return mediaPlayer != null && !preparing ? mediaPlayer.getCurrentPosition() : 0;
+        } catch (IllegalStateException ignored) {
+            return 0;
+        }
+    }
+
+    public void seekTo(int position) {
+        try {
+            if (mediaPlayer != null && !preparing) mediaPlayer.seekTo(Math.max(0, position));
+        } catch (IllegalStateException ignored) {
+        }
+    }
+
+    public String getCurrentVideoName() {
+        if (externalUri != null) {
+            String segment = externalUri.getLastPathSegment();
+            return segment == null ? "外部動画" : segment;
+        }
+        if (videoFiles.isEmpty() || videoIndex < 0 || videoIndex >= videoFiles.size()) return null;
+        return videoFiles.get(videoIndex).getName();
+    }
+
+    public void playNextManually() {
+        if (externalUri != null) {
+            externalUri = null;
+            currentVideoPath = null;
+            loadVideos();
+            if (!videoFiles.isEmpty()) {
+                videoIndex = 0;
+                prepareCurrentVideo();
+            }
+            return;
+        }
+        if (videoFiles.isEmpty()) loadVideos();
+        if (videoFiles.isEmpty()) return;
+        advanceVideoIndex();
+        failedAttempts = 0;
+        currentVideoPath = null;
+        prepareCurrentVideo();
+    }
+
+    public void playPreviousManually() {
+        if (externalUri != null) {
+            externalUri = null;
+            currentVideoPath = null;
+            loadVideos();
+            if (!videoFiles.isEmpty()) {
+                videoIndex = 0;
+                prepareCurrentVideo();
+            }
+            return;
+        }
+        if (videoFiles.isEmpty()) loadVideos();
+        if (videoFiles.isEmpty()) return;
+        videoIndex--;
+        if (videoIndex < 0) videoIndex = videoFiles.size() - 1;
+        failedAttempts = 0;
+        currentVideoPath = null;
+        prepareCurrentVideo();
+    }
+
     public void stop() {
         playbackRequested = false;
         externalUri = null;

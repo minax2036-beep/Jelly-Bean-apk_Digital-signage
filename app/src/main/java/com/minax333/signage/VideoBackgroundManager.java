@@ -159,7 +159,8 @@ public final class VideoBackgroundManager implements TextureView.SurfaceTextureL
 
     private void prepareCurrentVideo() {
         if (released || !playbackRequested || preparing
-                || surfaceTexture == null || videoFiles.isEmpty()) {
+                || surfaceTexture == null
+                || (externalUri == null && videoFiles.isEmpty())) {
             return;
         }
 

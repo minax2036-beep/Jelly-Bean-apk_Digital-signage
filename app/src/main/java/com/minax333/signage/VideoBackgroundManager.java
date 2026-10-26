@@ -1,88 +1,62 @@
 package com.minax333.signage;
 
 import android.app.Activity;
+import android.graphics.SurfaceTexture;
 import android.media.MediaPlayer;
-import android.net.Uri;
+import android.view.Surface;
+import android.view.TextureView;
 import android.view.View;
-import android.widget.VideoView;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 /**
  * Plays videos from signage/videos in filename order.
- * Uses VideoView APIs available on Android 4.2.2 (API 17).
+ * Uses TextureView + MediaPlayer for Android 4.2.2 (API 17).
  */
-public final class VideoBackgroundManager {
+public final class VideoBackgroundManager implements TextureView.SurfaceTextureListener {
 
     public interface Listener {
         void onNoVideosFound();
     }
 
     private final Activity activity;
-    private final VideoView videoView;
+    private final TextureView textureView;
     private final Listener listener;
     private final List<File> videoFiles = new ArrayList<File>();
 
     private int videoIndex = 0;
     private int failedAttempts = 0;
-    private boolean released = false;
     private boolean playbackRequested = false;
+    private boolean preparing = false;
+    private boolean released = false;
     private String currentVideoPath = null;
+    private MediaPlayer mediaPlayer;
+    private Surface videoSurface;
+    private SurfaceTexture surfaceTexture;
 
     public VideoBackgroundManager(
             Activity activity,
-            VideoView videoView,
+            TextureView textureView,
             Listener listener
     ) {
         this.activity = activity;
-        this.videoView = videoView;
+        this.textureView = textureView;
         this.listener = listener;
-
-        videoView.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-            @Override
-            public void onCompletion(MediaPlayer player) {
-                playNextVideo();
-            }
-        });
-
-        videoView.setOnErrorListener(new MediaPlayer.OnErrorListener() {
-            @Override
-            public boolean onError(MediaPlayer player, int what, int extra) {
-                failedAttempts++;
-                if (failedAttempts >= videoFiles.size()) {
-                    stop();
-                    VideoBackgroundManager.this.listener.onNoVideosFound();
-                } else {
-                    playNextVideo();
-                }
-                return true;
-            }
-        });
-
-        videoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-            @Override
-            public void onPrepared(MediaPlayer player) {
-                if (!released && videoView.getVisibility() == View.VISIBLE) {
-                    failedAttempts = 0;
-                    try {
-                        player.setLooping(false);
-                        videoView.start();
-                    } catch (IllegalStateException ignored) {
-                    }
-                }
-            }
-        });
+        textureView.setSurfaceTextureListener(this);
     }
 
     public void start() {
         released = false;
+        playbackRequested = true;
         loadVideos();
 
         if (videoFiles.isEmpty()) {
-            videoView.stopPlayback();
+            playbackRequested = false;
+            releasePlayer();
             listener.onNoVideosFound();
             return;
         }
@@ -91,32 +65,40 @@ public final class VideoBackgroundManager {
             videoIndex = 0;
         }
 
-        File selectedFile = videoFiles.get(videoIndex);
-        if (playbackRequested
-                && selectedFile.getAbsolutePath().equals(currentVideoPath)
-                && videoView.getVisibility() == View.VISIBLE) {
+        File selected = videoFiles.get(videoIndex);
+        if (selected.getAbsolutePath().equals(currentVideoPath)
+                && (preparing || (mediaPlayer != null && isPlayerPlayingSafely()))) {
             return;
         }
 
-        failedAttempts = 0;
-        playCurrentVideo();
+        if (textureView.isAvailable()) {
+            surfaceTexture = textureView.getSurfaceTexture();
+            prepareCurrentVideo();
+        }
     }
 
     public void stop() {
-        released = true;
         playbackRequested = false;
         currentVideoPath = null;
-        try {
-            videoView.stopPlayback();
-        } catch (IllegalStateException ignored) {
-        }
+        releasePlayer();
     }
 
     public void release() {
         stop();
-        videoView.setOnCompletionListener(null);
-        videoView.setOnErrorListener(null);
-        videoView.setOnPreparedListener(null);
+        released = true;
+        textureView.setSurfaceTextureListener(null);
+        if (videoSurface != null) {
+            videoSurface.release();
+            videoSurface = null;
+        }
+    }
+
+    private boolean isPlayerPlayingSafely() {
+        try {
+            return mediaPlayer != null && mediaPlayer.isPlaying();
+        } catch (IllegalStateException ignored) {
+            return false;
+        }
     }
 
     private void loadVideos() {
@@ -137,8 +119,7 @@ public final class VideoBackgroundManager {
             });
 
             for (File file : files) {
-                if (file.isFile()
-                        && file.canRead()
+                if (file.isFile() && file.canRead()
                         && MediaFileUtils.isVideoFile(file)
                         && !videoFiles.contains(file)) {
                     videoFiles.add(file);
@@ -151,41 +132,160 @@ public final class VideoBackgroundManager {
         }
     }
 
-    private void playCurrentVideo() {
-        if (released || videoFiles.isEmpty()) {
+    private void prepareCurrentVideo() {
+        if (released || !playbackRequested || preparing
+                || surfaceTexture == null || videoFiles.isEmpty()) {
             return;
         }
 
-        File file = videoFiles.get(videoIndex);
+        if (videoIndex < 0 || videoIndex >= videoFiles.size()) {
+            videoIndex = 0;
+        }
+
+        final File file = videoFiles.get(videoIndex);
+        releasePlayer();
+        currentVideoPath = file.getAbsolutePath();
+
         try {
-            currentVideoPath = file.getAbsolutePath();
-            playbackRequested = true;
-            videoView.setVideoURI(Uri.fromFile(file));
-            videoView.requestFocus();
-            videoView.requestLayout();
-            videoView.invalidate();
+            videoSurface = new Surface(surfaceTexture);
+            final MediaPlayer player = new MediaPlayer();
+            mediaPlayer = player;
+            preparing = true;
+
+            player.setSurface(videoSurface);
+            player.setDataSource(file.getAbsolutePath());
+            player.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                @Override
+                public void onPrepared(MediaPlayer mp) {
+                    if (mediaPlayer != player || !playbackRequested || released) {
+                        return;
+                    }
+                    preparing = false;
+                    failedAttempts = 0;
+                    try {
+                        player.setLooping(false);
+                        player.start();
+                    } catch (IllegalStateException exception) {
+                        handlePlaybackFailure();
+                    }
+                }
+            });
+
+            player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                @Override
+                public void onCompletion(MediaPlayer mp) {
+                    if (mediaPlayer == player) {
+                        playNextVideo();
+                    }
+                }
+            });
+
+            player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+                @Override
+                public boolean onError(MediaPlayer mp, int what, int extra) {
+                    if (mediaPlayer == player) {
+                        handlePlaybackFailure();
+                    }
+                    return true;
+                }
+            });
+
+            player.prepareAsync();
+        } catch (IOException exception) {
+            handlePlaybackFailure();
         } catch (IllegalArgumentException exception) {
-            failedAttempts++;
-            playNextVideo();
+            handlePlaybackFailure();
+        } catch (IllegalStateException exception) {
+            handlePlaybackFailure();
+        }
+    }
+
+    private void handlePlaybackFailure() {
+        failedAttempts++;
+        releasePlayer();
+
+        if (!playbackRequested || released) {
+            return;
+        }
+
+        if (failedAttempts >= videoFiles.size()) {
+            playbackRequested = false;
+            currentVideoPath = null;
+            listener.onNoVideosFound();
+        } else {
+            advanceVideoIndex();
+            prepareCurrentVideo();
         }
     }
 
     private void playNextVideo() {
-        if (released || videoFiles.isEmpty()) {
+        if (!playbackRequested || released || videoFiles.isEmpty()) {
             return;
         }
+        failedAttempts = 0;
+        advanceVideoIndex();
+        currentVideoPath = null;
+        prepareCurrentVideo();
+    }
 
+    private void advanceVideoIndex() {
         videoIndex++;
         if (videoIndex >= videoFiles.size()) {
             videoIndex = 0;
         }
+    }
 
-        if (failedAttempts >= videoFiles.size()) {
-            stop();
-            listener.onNoVideosFound();
-            return;
+    private void releasePlayer() {
+        preparing = false;
+
+        if (mediaPlayer != null) {
+            MediaPlayer oldPlayer = mediaPlayer;
+            mediaPlayer = null;
+            oldPlayer.setOnPreparedListener(null);
+            oldPlayer.setOnCompletionListener(null);
+            oldPlayer.setOnErrorListener(null);
+            try {
+                oldPlayer.stop();
+            } catch (IllegalStateException ignored) {
+            }
+            oldPlayer.reset();
+            oldPlayer.release();
         }
 
-        playCurrentVideo();
+        if (videoSurface != null) {
+            videoSurface.release();
+            videoSurface = null;
+        }
+    }
+
+    @Override
+    public void onSurfaceTextureAvailable(
+            SurfaceTexture surface,
+            int width,
+            int height
+    ) {
+        surfaceTexture = surface;
+        if (playbackRequested) {
+            prepareCurrentVideo();
+        }
+    }
+
+    @Override
+    public void onSurfaceTextureSizeChanged(
+            SurfaceTexture surface,
+            int width,
+            int height
+    ) {
+    }
+
+    @Override
+    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+        surfaceTexture = null;
+        releasePlayer();
+        return true;
+    }
+
+    @Override
+    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
     }
 }

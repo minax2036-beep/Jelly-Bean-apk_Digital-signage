@@ -34,8 +34,8 @@ public final class MusicPanel {
 
         panel = new LinearLayout(activity);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(20, 16, 20, 16);
-        panel.setBackgroundColor(Color.rgb(24, 24, 24));
+        panel.setPadding(16, 14, 16, 14);
+        panel.setBackgroundColor(Color.rgb(17, 24, 39));
         panel.setVisibility(View.GONE);
 
         LinearLayout header = new LinearLayout(activity);
@@ -44,7 +44,7 @@ public final class MusicPanel {
 
         Button backButton = new Button(activity);
         backButton.setText("戻る");
-        backButton.setTextSize(16);
+        UiStyle.styleSecondaryButton(backButton);
         backButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -56,7 +56,8 @@ public final class MusicPanel {
         TextView title = new TextView(activity);
         title.setText("音楽ライブラリ");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(24);
+        title.setTextSize(23);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         header.addView(title, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
@@ -65,13 +66,14 @@ public final class MusicPanel {
 
         nowPlayingText = new TextView(activity);
         nowPlayingText.setTextColor(Color.LTGRAY);
-        nowPlayingText.setTextSize(17);
+        nowPlayingText.setTextSize(16);
+        nowPlayingText.setBackground(UiStyle.makeBackground(Color.rgb(31, 41, 55), 12));
         nowPlayingText.setPadding(8, 12, 8, 12);
         panel.addView(nowPlayingText, matchWrapParams());
 
         emptyText = new TextView(activity);
         emptyText.setTextColor(Color.LTGRAY);
-        emptyText.setTextSize(18);
+        emptyText.setTextSize(17);
         emptyText.setGravity(Gravity.CENTER);
         emptyText.setText("音楽ファイルがありません。\n"
                 + "/sdcard/signage/audio/ に音楽を入れてください。");
@@ -89,7 +91,7 @@ public final class MusicPanel {
         hint.setText("曲をタップすると選択できます。\n"
                 + "左スワイプでメイン画面へ戻ります。");
         hint.setTextColor(Color.LTGRAY);
-        hint.setTextSize(14);
+        hint.setTextSize(13);
         hint.setPadding(8, 8, 8, 8);
         panel.addView(hint, matchWrapParams());
     }

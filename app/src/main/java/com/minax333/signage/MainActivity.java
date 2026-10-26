@@ -95,6 +95,14 @@ public class MainActivity extends Activity {
 
     private boolean audioPreparing = false;
     private boolean manualAudioPlayback = false;
+    private boolean userSeekingAudio = false;
+    private final Runnable updateMusicPlayerRunnable = new Runnable() {
+        @Override public void run() {
+            if (!running) return;
+            updateMusicPlayerUi();
+            handler.postDelayed(this, 500L);
+        }
+    };
     private SlideshowManager slideshowManager;
 
 
@@ -750,8 +758,32 @@ public class MainActivity extends Activity {
                     }
 
                     @Override
-                    public void onSelectTrack(int index) {
-                        selectAudioTrack(index);
+                    public void onSelectTrack(int index) { selectAudioTrack(index); }
+                    @Override
+                    public void onPlayPause() { toggleAudioPlayback(); }
+                    @Override
+                    public void onPrevious() { playAdjacentTrack(-1); }
+                    @Override
+                    public void onNext() { playAdjacentTrack(1); }
+                    @Override
+                    public void onSeekStart() { userSeekingAudio = true; }
+                    @Override
+                    public void onSeekChanged(int progress, boolean fromUser) {
+                        if (fromUser) {
+                            int duration = getAudioDuration();
+                            musicPanel.setPositionText(formatVideoTime((int) ((long) duration * progress / 1000L)),
+                                    formatVideoTime(duration));
+                        }
+                    }
+                    @Override
+                    public void onSeekStop(int progress) {
+                        int duration = getAudioDuration();
+                        if (duration > 0 && mediaPlayer != null && !audioPreparing) {
+                            try { mediaPlayer.seekTo((int) ((long) duration * progress / 1000L)); }
+                            catch (IllegalStateException ignored) { }
+                        }
+                        userSeekingAudio = false;
+                        updateMusicPlayerUi();
                     }
                 }
         );
@@ -924,21 +956,72 @@ public class MainActivity extends Activity {
     }
 
     private void updateNowPlayingLabel() {
-        if (musicPanel.nowPlayingText == null) {
+        if (musicPanel.nowPlayingText == null) return;
+        if (settingsManager.selectedAudioName == null || settingsManager.selectedAudioName.length() == 0) {
+            musicPanel.nowPlayingText.setText("NOW PLAYING  •  選択中の曲：なし");
+        } else {
+            musicPanel.nowPlayingText.setText("NOW PLAYING  •  " + settingsManager.selectedAudioName);
+        }
+        updateMusicPlayerUi();
+    }
+
+    private void toggleAudioPlayback() {
+        if (mediaPlayer != null && !audioPreparing) {
+            try {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.pause();
+                    manualAudioPlayback = true;
+                } else {
+                    manualAudioPlayback = true;
+                    mediaPlayer.start();
+                }
+            } catch (IllegalStateException ignored) { }
+            updateMusicPlayerUi();
             return;
         }
+        loadAudioFiles();
+        if (audioFiles.isEmpty()) {
+            updateMusicLibrary();
+            return;
+        }
+        manualAudioPlayback = true;
+        int selected = findAudioIndex(settingsManager.selectedAudioName);
+        if (selected >= 0) audioIndex = selected;
+        playAudioAtIndex(audioIndex);
+    }
 
-        if (settingsManager.selectedAudioName == null
-                || settingsManager.selectedAudioName.length() == 0) {
-            musicPanel.nowPlayingText.setText(
-                    "選択中の曲：なし\n"
-                            + "曲をタップして選択してください。"
-            );
-        } else {
-            musicPanel.nowPlayingText.setText(
-                    "選択中の曲：" + settingsManager.selectedAudioName
-                            + "\n再生：ファイル名順・一覧を繰り返す"
-            );
+    private void playAdjacentTrack(int direction) {
+        loadAudioFiles();
+        if (audioFiles.isEmpty()) return;
+        int current = findAudioIndex(settingsManager.selectedAudioName);
+        if (current < 0) current = audioIndex;
+        int next = (current + direction + audioFiles.size()) % audioFiles.size();
+        manualAudioPlayback = true;
+        playAudioAtIndex(next);
+        updateMusicLibrary();
+    }
+
+    private int getAudioDuration() {
+        try { return mediaPlayer != null && !audioPreparing ? mediaPlayer.getDuration() : 0; }
+        catch (IllegalStateException ignored) { return 0; }
+    }
+
+    private int getAudioPosition() {
+        try { return mediaPlayer != null && !audioPreparing ? mediaPlayer.getCurrentPosition() : 0; }
+        catch (IllegalStateException ignored) { return 0; }
+    }
+
+    private void updateMusicPlayerUi() {
+        if (musicPanel == null) return;
+        boolean playing = false;
+        try { playing = mediaPlayer != null && !audioPreparing && mediaPlayer.isPlaying(); }
+        catch (IllegalStateException ignored) { }
+        musicPanel.setTrack(settingsManager.selectedAudioName, playing);
+        int duration = getAudioDuration();
+        int position = getAudioPosition();
+        musicPanel.setPositionText(formatVideoTime(position), formatVideoTime(duration));
+        if (!userSeekingAudio) {
+            musicPanel.setProgress(duration > 0 ? (int) ((long) position * 1000L / duration) : 0);
         }
     }
 
@@ -1339,6 +1422,7 @@ public class MainActivity extends Activity {
                             try {
                                 player.start();
                                 updateNowPlayingLabel();
+                                updateMusicPlayerUi();
                             } catch (IllegalStateException e) {
                                 skipToNextTrack();
                             }
@@ -1514,6 +1598,8 @@ public class MainActivity extends Activity {
         updateMusicLibrary();
 
         handler.postDelayed(clockRunnable, CLOCK_INTERVAL);
+        handler.removeCallbacks(updateMusicPlayerRunnable);
+        handler.post(updateMusicPlayerRunnable);
 
         if (shouldPlayBackgroundMusic()) {
             startAudioPlayback();
@@ -1531,6 +1617,7 @@ public class MainActivity extends Activity {
         handler.removeCallbacks(clockRunnable);
         handler.removeCallbacks(updateVideoControlsRunnable);
         handler.removeCallbacks(hideVideoControlsRunnable);
+        handler.removeCallbacks(updateMusicPlayerRunnable);
         slideshowManager.stopTimer();
         if (videoBackgroundManager != null) {
             videoBackgroundManager.stop();

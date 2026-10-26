@@ -39,6 +39,22 @@ public class MainActivity extends Activity {
     private ImageView imageView;
     private TextureView videoView;
     private VideoBackgroundManager videoBackgroundManager;
+    private VideoControlsPanel videoControlsPanel;
+    private boolean userSeekingVideo = false;
+    private final Runnable hideVideoControlsRunnable = new Runnable() {
+        @Override public void run() {
+            if (videoControlsPanel != null && settingsManager.videoMode && !settingsVisible && !musicVisible && !homeVisible) {
+                videoControlsPanel.getView().setVisibility(View.GONE);
+            }
+        }
+    };
+    private final Runnable updateVideoControlsRunnable = new Runnable() {
+        @Override public void run() {
+            if (!running || videoControlsPanel == null || !settingsManager.videoMode) return;
+            if (videoControlsPanel.getView().getVisibility() == View.VISIBLE) updateVideoControls();
+            handler.postDelayed(this, 500L);
+        }
+    };
     private TextView clockTextView;
     private TextView dateTextView;
     private TextView statusTextView;
@@ -434,6 +450,55 @@ public class MainActivity extends Activity {
                 }
         );
 
+        videoControlsPanel = new VideoControlsPanel(this, new VideoControlsPanel.Listener() {
+            @Override public void onPlayPause() {
+                videoBackgroundManager.togglePlayback();
+                updateVideoControls();
+                showVideoControls();
+            }
+            @Override public void onPrevious() {
+                videoBackgroundManager.playPreviousManually();
+                updateVideoControls();
+                showVideoControls();
+            }
+            @Override public void onNext() {
+                videoBackgroundManager.playNextManually();
+                updateVideoControls();
+                showVideoControls();
+            }
+            @Override public void onSeekStart() {
+                userSeekingVideo = true;
+            }
+            @Override public void onSeekChanged(int progress, boolean fromUser) {
+                if (fromUser) {
+                    int duration = videoBackgroundManager.getDuration();
+                    videoControlsPanel.setPositionText(
+                            formatVideoTime((int) ((long) duration * progress / 1000L)),
+                            formatVideoTime(duration));
+                }
+            }
+            @Override public void onSeekStop(int progress) {
+                int duration = videoBackgroundManager.getDuration();
+                if (duration > 0) videoBackgroundManager.seekTo((int) ((long) duration * progress / 1000L));
+                userSeekingVideo = false;
+                updateVideoControls();
+                showVideoControls();
+            }
+        });
+        videoControlsPanel.getView().setVisibility(View.GONE);
+        rootLayout.addView(videoControlsPanel.getView(), new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        videoView.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View view) {
+                if (videoControlsPanel.getView().getVisibility() == View.VISIBLE) {
+                    handler.removeCallbacks(hideVideoControlsRunnable);
+                    videoControlsPanel.getView().setVisibility(View.GONE);
+                } else {
+                    showVideoControls();
+                }
+            }
+        });
+
         /*
          * Settings button.
          */
@@ -624,6 +689,9 @@ public class MainActivity extends Activity {
         if (videoBackgroundManager != null) {
             videoBackgroundManager.stop();
         }
+        handler.removeCallbacks(updateVideoControlsRunnable);
+        handler.removeCallbacks(hideVideoControlsRunnable);
+        if (videoControlsPanel != null) videoControlsPanel.getView().setVisibility(View.GONE);
         if (slideshowManager != null) {
             slideshowManager.stopTimer();
         }
@@ -1054,8 +1122,14 @@ public class MainActivity extends Activity {
             musicButton.bringToFront();
 
             videoBackgroundManager.start();
+            showVideoControls();
+            handler.removeCallbacks(updateVideoControlsRunnable);
+            handler.post(updateVideoControlsRunnable);
         } else {
             videoBackgroundManager.stop();
+            handler.removeCallbacks(updateVideoControlsRunnable);
+            handler.removeCallbacks(hideVideoControlsRunnable);
+            if (videoControlsPanel != null) videoControlsPanel.getView().setVisibility(View.GONE);
             videoView.setVisibility(View.GONE);
             imageView.setVisibility(View.VISIBLE);
             slideshowManager.showCurrentImageOrStandby();
@@ -1065,6 +1139,37 @@ public class MainActivity extends Activity {
                 startAudioPlayback();
             }
         }
+    }
+
+    private void showVideoControls() {
+        if (videoControlsPanel == null || !settingsManager.videoMode || homeVisible || settingsVisible || musicVisible) return;
+        videoControlsPanel.getView().setVisibility(View.VISIBLE);
+        videoControlsPanel.getView().bringToFront();
+        homeButton.bringToFront();
+        settingsButton.bringToFront();
+        musicButton.bringToFront();
+        updateVideoControls();
+        handler.removeCallbacks(hideVideoControlsRunnable);
+        handler.postDelayed(hideVideoControlsRunnable, 4500L);
+    }
+
+    private void updateVideoControls() {
+        if (videoControlsPanel == null || videoBackgroundManager == null) return;
+        String name = videoBackgroundManager.getCurrentVideoName();
+        videoControlsPanel.setTitle(name == null ? "動画を読み込み中…" : name);
+        videoControlsPanel.setPlayPauseText(videoBackgroundManager.isPlaying() ? "❚❚" : "▶");
+        int duration = videoBackgroundManager.getDuration();
+        int position = videoBackgroundManager.getCurrentPosition();
+        videoControlsPanel.setPositionText(formatVideoTime(position), formatVideoTime(duration));
+        if (!userSeekingVideo) {
+            videoControlsPanel.setProgress(duration > 0 ? (int) ((long) position * 1000L / duration) : 0);
+        }
+    }
+
+    private String formatVideoTime(int millis) {
+        if (millis < 0) millis = 0;
+        int totalSeconds = millis / 1000;
+        return String.format(Locale.getDefault(), "%02d:%02d", totalSeconds / 60, totalSeconds % 60);
     }
 
     private void updateClock() {
@@ -1388,6 +1493,7 @@ public class MainActivity extends Activity {
         running = true;
 
         handler.removeCallbacks(clockRunnable);
+        handler.removeCallbacks(updateVideoControlsRunnable);
         slideshowManager.stopTimer();
 
         loadSettings();
@@ -1423,6 +1529,8 @@ public class MainActivity extends Activity {
         running = false;
 
         handler.removeCallbacks(clockRunnable);
+        handler.removeCallbacks(updateVideoControlsRunnable);
+        handler.removeCallbacks(hideVideoControlsRunnable);
         slideshowManager.stopTimer();
         if (videoBackgroundManager != null) {
             videoBackgroundManager.stop();
@@ -1438,6 +1546,8 @@ public class MainActivity extends Activity {
         running = false;
 
         handler.removeCallbacks(clockRunnable);
+        handler.removeCallbacks(updateVideoControlsRunnable);
+        handler.removeCallbacks(hideVideoControlsRunnable);
         slideshowManager.stopTimer();
 
         stopAudioPlayback();

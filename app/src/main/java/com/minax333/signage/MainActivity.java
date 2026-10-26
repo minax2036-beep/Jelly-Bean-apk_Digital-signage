@@ -335,8 +335,11 @@ public class MainActivity extends Activity {
          */
         statusTextView = new TextView(this);
         statusTextView.setTextColor(Color.LTGRAY);
-        statusTextView.setTextSize(18);
+        statusTextView.setTextSize(20);
+        statusTextView.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         statusTextView.setGravity(Gravity.CENTER);
+        statusTextView.setPadding(24, 18, 24, 18);
+        statusTextView.setBackground(UiStyle.makeBackground(Color.argb(190, 15, 23, 42), 18));
         statusTextView.setText("Signage\n待機中");
 
         FrameLayout.LayoutParams statusParams =
@@ -352,11 +355,8 @@ public class MainActivity extends Activity {
          * Date display.
          */
         dateTextView = new TextView(this);
-        dateTextView.setTextColor(Color.WHITE);
-        dateTextView.setTextSize(18);
         dateTextView.setGravity(Gravity.CENTER);
-        dateTextView.setShadowLayer(4, 1, 1, Color.BLACK);
-        dateTextView.setPadding(12, 8, 12, 4);
+        UiStyle.styleOverlay(dateTextView, 17);
 
         FrameLayout.LayoutParams dateParams =
                 new FrameLayout.LayoutParams(
@@ -371,11 +371,8 @@ public class MainActivity extends Activity {
          * Clock display.
          */
         clockTextView = new TextView(this);
-        clockTextView.setTextColor(Color.WHITE);
-        clockTextView.setTextSize(32);
         clockTextView.setGravity(Gravity.CENTER);
-        clockTextView.setShadowLayer(4, 1, 1, Color.BLACK);
-        clockTextView.setPadding(12, 4, 12, 12);
+        UiStyle.styleOverlay(clockTextView, 30);
 
         FrameLayout.LayoutParams clockParams =
                 new FrameLayout.LayoutParams(
@@ -433,7 +430,7 @@ public class MainActivity extends Activity {
          */
         settingsButton = new Button(this);
         settingsButton.setText("設定");
-        settingsButton.setTextSize(14);
+        UiStyle.styleButton(settingsButton);
 
         settingsButton.setOnClickListener(
                 new View.OnClickListener() {
@@ -451,7 +448,7 @@ public class MainActivity extends Activity {
                         Gravity.TOP | Gravity.RIGHT
                 );
 
-        settingsButtonParams.setMargins(0, 8, 8, 0);
+        settingsButtonParams.setMargins(0, 12, 12, 0);
 
         rootLayout.addView(
                 settingsButton,
@@ -464,7 +461,7 @@ public class MainActivity extends Activity {
          */
         musicButton = new Button(this);
         musicButton.setText("音楽 ♪");
-        musicButton.setTextSize(16);
+        UiStyle.styleButton(musicButton);
 
         musicButton.setOnClickListener(
                 new View.OnClickListener() {
@@ -482,7 +479,7 @@ public class MainActivity extends Activity {
                         Gravity.BOTTOM | Gravity.RIGHT
                 );
 
-        musicButtonParams.setMargins(0, 0, 12, 90);
+        musicButtonParams.setMargins(0, 0, 12, 96);
 
         rootLayout.addView(
                 musicButton,

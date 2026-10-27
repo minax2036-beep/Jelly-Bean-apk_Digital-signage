@@ -214,11 +214,10 @@ public final class Home {
                     }
                     dayNumber++;
                 }
-                row.addView(day, new LinearLayout.LayoutParams(0, 0, 1));
-                LinearLayout.LayoutParams cellParams = (LinearLayout.LayoutParams) day.getLayoutParams();
-                cellParams.height = 0;
-                cellParams.weight = 1;
-                day.setLayoutParams(cellParams);
+                // Each date cell must fill the height allocated to its week row.
+                // A height of 0 without a weight on the child itself made the dates invisible.
+                row.addView(day, new LinearLayout.LayoutParams(
+                        0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
             }
             calendarGrid.addView(row, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
